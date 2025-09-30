@@ -1,0 +1,13 @@
+# PartialMinimalTrackedResourceWithSkuAndIdentity
+
+## Properties
+
+Name | Type | Description | Notes
+------------ | ------------- | ------------- | -------------
+**identity** | Option<[**models::PartialManagedServiceIdentity**](PartialManagedServiceIdentity.md)> |  | [optional]
+**sku** | Option<[**models::PartialSku**](PartialSku.md)> |  | [optional]
+**tags** | Option<**std::collections::HashMap<String, String>**> | Resource tags. | [optional]
+
+[[Back to Model list]](../README.md#documentation-for-models) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to README]](../README.md)
+
+
