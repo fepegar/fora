@@ -3,9 +3,13 @@
 //! This crate provides a high-level client for interacting with Azure ML services.
 
 pub mod client;
+pub mod models;
 
 // Re-export the main client
 pub use client::{AzureMLClient, AzureMLConfig};
+
+// Re-export all models for convenience
+pub use models::*;
 
 /// Result type for Azure ML operations
 pub type Result<T> = std::result::Result<T, AzureMLError>;
