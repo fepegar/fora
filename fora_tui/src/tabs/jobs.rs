@@ -1,6 +1,7 @@
 use super::Tab;
 use crate::app::AppEvent;
 use crate::navigation::{NavigationContext, TabNavigator};
+use crate::select_keys;
 use crate::{
     azure::{AzureClient, Job, JobDetails, JobStatus},
     cache::CacheManager,
@@ -319,7 +320,7 @@ impl Tab for JobsTab {
                     self.next_job();
                 }
             }
-            KeyCode::Enter => self.select_current_job(),
+            select_keys!() => self.select_current_job(),
             KeyCode::Esc => {
                 if self.show_details {
                     let _ = self

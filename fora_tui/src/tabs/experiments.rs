@@ -1,6 +1,7 @@
 use super::Tab;
 use crate::app::AppEvent;
 use crate::navigation::{NavigationContext, TabNavigator};
+use crate::select_keys;
 use crate::{
     azure::{AzureClient, Experiment, Job},
     cache::CacheManager,
@@ -233,7 +234,7 @@ impl Tab for ExperimentsTab {
                     }
                 }
             }
-            KeyCode::Enter => {
+            select_keys!() => {
                 if !self.show_jobs {
                     if let Some(selected) = self.experiments_list_state.selected() {
                         if let Some(experiment) = self.experiments.get(selected) {
@@ -322,18 +323,32 @@ impl ExperimentsTab {
             })
             .collect();
 
-        let title = if self.loading {
-            "Experiments (Loading...)"
+        // Different border configurations based on whether jobs pane is shown
+        let border_set = if self.show_jobs {
+            // When jobs pane is open, don't show right border and use connecting corners
+            let connecting_border_set = symbols::border::Set {
+                top_left: symbols::line::VERTICAL_RIGHT,
+                top_right: symbols::line::HORIZONTAL_DOWN,
+                bottom_right: symbols::line::HORIZONTAL_UP,
+                ..symbols::border::ROUNDED
+            };
+            connecting_border_set
         } else {
-            "Experiments"
+            // When jobs pane is closed, show all borders with normal corners
+            let normal_border_set = symbols::border::Set {
+                top_left: symbols::line::VERTICAL_RIGHT,
+                top_right: symbols::line::VERTICAL_LEFT,
+                ..symbols::border::ROUNDED
+            };
+            normal_border_set
         };
 
         let experiments_list = List::new(items)
             .block(
                 Block::default()
                     .borders(Borders::ALL)
-                    .title(title)
-                    .border_type(BorderType::Rounded),
+                    .border_set(border_set)
+                    .border_style(Style::default().fg(Color::Gray)),
             )
             .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
 
@@ -383,18 +398,19 @@ impl ExperimentsTab {
             })
             .collect();
 
-        let title = if let Some(exp_id) = &self.selected_experiment {
-            format!("Jobs in Experiment: {}", exp_id)
-        } else {
-            "Experiment Jobs".to_string()
+        // Jobs pane connects to experiments pane, so no left border and connecting corners
+        let jobs_border_set = symbols::border::Set {
+            top_left: symbols::line::VERTICAL_RIGHT,
+            top_right: symbols::line::VERTICAL_LEFT,
+            ..symbols::border::ROUNDED
         };
 
         let jobs_list = List::new(items)
             .block(
                 Block::default()
-                    .borders(Borders::ALL)
-                    .title(title)
-                    .border_type(BorderType::Rounded),
+                    .borders(Borders::TOP | Borders::BOTTOM | Borders::RIGHT)
+                    .border_set(jobs_border_set)
+                    .border_style(Style::default().fg(Color::Gray)),
             )
             .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
 

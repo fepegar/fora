@@ -12,6 +12,7 @@ mod azure;
 mod cache;
 mod config;
 mod events;
+mod keys;
 mod navigation;
 mod tab_registry;
 mod tabs;

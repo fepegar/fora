@@ -1,6 +1,8 @@
 use super::Tab;
 use crate::app::AppEvent;
+use crate::keys::help_text;
 use crate::navigation::{NavigationContext, TabNavigator};
+use crate::select_keys;
 use crate::{azure::AzureClient, cache::CacheManager};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -225,7 +227,7 @@ impl Tab for ComputeTab {
                     self.list_state.select(Some(i));
                 }
             }
-            KeyCode::Enter => {
+            select_keys!() => {
                 if let Some(selected) = self.list_state.selected() {
                     if let Some(compute) = self.compute_targets.get(selected) {
                         let _ = self.event_tx.send(AppEvent::ComputeEvent(
@@ -327,18 +329,19 @@ impl Tab for ComputeTab {
             })
             .collect();
 
-        let title = if self.loading {
-            "Compute Targets (Loading...)"
-        } else {
-            "Compute Targets"
+        // Use consistent border set with connecting corners
+        let border_set = symbols::border::Set {
+            top_left: symbols::line::VERTICAL_RIGHT,
+            top_right: symbols::line::VERTICAL_LEFT,
+            ..symbols::border::ROUNDED
         };
 
         let compute_list = List::new(items)
             .block(
                 Block::default()
                     .borders(Borders::ALL)
-                    .title(title)
-                    .border_type(BorderType::Rounded),
+                    .border_set(border_set)
+                    .border_style(Style::default().fg(Color::Gray)),
             )
             .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
 
@@ -352,14 +355,24 @@ impl Tab for ComputeTab {
             height: 3,
         };
 
-        let help_text = Paragraph::new("s: Start/Stop | Ctrl+d: Delete | Enter: Select")
-            .block(
-                Block::default()
-                    .borders(Borders::TOP)
-                    .border_type(BorderType::Rounded),
-            )
-            .style(Style::default().fg(Color::DarkGray))
-            .alignment(Alignment::Center);
+        let help_border_set = symbols::border::Set {
+            top_left: symbols::line::VERTICAL_RIGHT,
+            top_right: symbols::line::VERTICAL_LEFT,
+            ..symbols::border::ROUNDED
+        };
+
+        let help_text = Paragraph::new(format!(
+            "s: Start/Stop | Ctrl+d: Delete | {}: Select",
+            help_text::SELECT_KEYS
+        ))
+        .block(
+            Block::default()
+                .borders(Borders::TOP)
+                .border_set(help_border_set)
+                .border_style(Style::default().fg(Color::Gray)),
+        )
+        .style(Style::default().fg(Color::DarkGray))
+        .alignment(Alignment::Center);
 
         f.render_widget(help_text, help_area);
     }

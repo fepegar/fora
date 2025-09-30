@@ -1,6 +1,8 @@
 use super::Tab;
 use crate::app::AppEvent;
+use crate::keys::help_text;
 use crate::navigation::{NavigationContext, TabNavigator};
+use crate::select_keys;
 use crate::{
     azure::{AzureClient, Experiment, Job, JobStatus},
     cache::CacheManager,
@@ -239,7 +241,7 @@ impl Tab for HomeTab {
             KeyCode::Down => {
                 self.navigate_current_panel();
             }
-            KeyCode::Enter => {
+            select_keys!() => {
                 self.select_current_item();
             }
             KeyCode::Char('j') => {
@@ -319,11 +321,18 @@ impl HomeTab {
             ),
         ])];
 
+        let header_border_set = symbols::border::Set {
+            top_left: symbols::line::VERTICAL_RIGHT,
+            top_right: symbols::line::VERTICAL_LEFT,
+            ..symbols::border::ROUNDED
+        };
+
         let header = Paragraph::new(welcome_text)
             .block(
                 Block::default()
                     .borders(Borders::ALL)
-                    .border_type(BorderType::Rounded),
+                    .border_set(header_border_set)
+                    .border_style(Style::default().fg(Color::Gray)),
             )
             .alignment(Alignment::Center);
 
@@ -345,13 +354,20 @@ impl HomeTab {
                 "No recent jobs found.\nPress 'j' to go to Jobs tab."
             };
 
+            let jobs_border_set = symbols::border::Set {
+                top_left: symbols::line::VERTICAL_RIGHT,
+                top_right: symbols::line::HORIZONTAL_DOWN,
+                bottom_right: symbols::line::HORIZONTAL_UP,
+                ..symbols::border::ROUNDED
+            };
+
             let paragraph = Paragraph::new(empty_text)
                 .block(
                     Block::default()
                         .borders(Borders::ALL)
                         .title("📋 Recent Jobs")
-                        .border_style(border_style)
-                        .border_type(BorderType::Rounded),
+                        .border_set(jobs_border_set)
+                        .border_style(border_style),
                 )
                 .style(Style::default().fg(Color::Gray))
                 .alignment(Alignment::Center)
@@ -389,13 +405,20 @@ impl HomeTab {
             })
             .collect();
 
+        let jobs_border_set = symbols::border::Set {
+            top_left: symbols::line::VERTICAL_RIGHT,
+            top_right: symbols::line::HORIZONTAL_DOWN,
+            bottom_right: symbols::line::HORIZONTAL_UP,
+            ..symbols::border::ROUNDED
+        };
+
         let jobs_list = List::new(items)
             .block(
                 Block::default()
                     .borders(Borders::ALL)
                     .title("📋 Recent Jobs")
-                    .border_style(border_style)
-                    .border_type(BorderType::Rounded),
+                    .border_set(jobs_border_set)
+                    .border_style(border_style),
             )
             .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
 
@@ -410,9 +433,14 @@ impl HomeTab {
                 height: 2,
             };
 
-            let help = Paragraph::new("Enter: View details | ↕: Navigate | ↔: Switch panel")
-                .style(Style::default().fg(Color::DarkGray))
-                .alignment(Alignment::Center);
+            let help = Paragraph::new(format!(
+                "{}: View details | {}: Navigate | {}: Switch panel",
+                help_text::SELECT_KEYS,
+                help_text::NAV_KEYS,
+                help_text::SWITCH_PANEL_KEYS
+            ))
+            .style(Style::default().fg(Color::DarkGray))
+            .alignment(Alignment::Center);
 
             f.render_widget(help, help_area);
         }
@@ -433,13 +461,19 @@ impl HomeTab {
                 "No recent experiments found.\nPress 'e' to go to Experiments tab."
             };
 
+            let experiments_border_set = symbols::border::Set {
+                top_left: symbols::line::VERTICAL_RIGHT,
+                top_right: symbols::line::VERTICAL_LEFT,
+                ..symbols::border::ROUNDED
+            };
+
             let paragraph = Paragraph::new(empty_text)
                 .block(
                     Block::default()
-                        .borders(Borders::ALL)
+                        .borders(Borders::TOP | Borders::BOTTOM | Borders::RIGHT)
                         .title("🧪 Recent Experiments")
-                        .border_style(border_style)
-                        .border_type(BorderType::Rounded),
+                        .border_set(experiments_border_set)
+                        .border_style(border_style),
                 )
                 .style(Style::default().fg(Color::Gray))
                 .alignment(Alignment::Center)
@@ -474,13 +508,19 @@ impl HomeTab {
             })
             .collect();
 
+        let experiments_border_set = symbols::border::Set {
+            top_left: symbols::line::VERTICAL_RIGHT,
+            top_right: symbols::line::VERTICAL_LEFT,
+            ..symbols::border::ROUNDED
+        };
+
         let experiments_list = List::new(items)
             .block(
                 Block::default()
-                    .borders(Borders::ALL)
+                    .borders(Borders::TOP | Borders::BOTTOM | Borders::RIGHT)
                     .title("🧪 Recent Experiments")
-                    .border_style(border_style)
-                    .border_type(BorderType::Rounded),
+                    .border_set(experiments_border_set)
+                    .border_style(border_style),
             )
             .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
 
