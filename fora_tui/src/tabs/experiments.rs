@@ -329,9 +329,13 @@ impl ExperimentsTab {
         };
 
         let experiments_list = List::new(items)
-            .block(Block::default().borders(Borders::ALL).title(title))
-            .highlight_style(Style::default().add_modifier(Modifier::REVERSED))
-            .highlight_symbol(">> ");
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title(title)
+                    .border_type(BorderType::Rounded),
+            )
+            .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
 
         f.render_stateful_widget(
             experiments_list,
@@ -386,9 +390,13 @@ impl ExperimentsTab {
         };
 
         let jobs_list = List::new(items)
-            .block(Block::default().borders(Borders::ALL).title(title))
-            .highlight_style(Style::default().add_modifier(Modifier::REVERSED))
-            .highlight_symbol(">> ");
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title(title)
+                    .border_type(BorderType::Rounded),
+            )
+            .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
 
         f.render_stateful_widget(jobs_list, area, &mut self.jobs_list_state.clone());
     }

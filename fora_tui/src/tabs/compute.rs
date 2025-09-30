@@ -334,9 +334,13 @@ impl Tab for ComputeTab {
         };
 
         let compute_list = List::new(items)
-            .block(Block::default().borders(Borders::ALL).title(title))
-            .highlight_style(Style::default().add_modifier(Modifier::REVERSED))
-            .highlight_symbol(">> ");
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title(title)
+                    .border_type(BorderType::Rounded),
+            )
+            .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
 
         f.render_stateful_widget(compute_list, area, &mut self.list_state.clone());
 
@@ -349,7 +353,11 @@ impl Tab for ComputeTab {
         };
 
         let help_text = Paragraph::new("s: Start/Stop | Ctrl+d: Delete | Enter: Select")
-            .block(Block::default().borders(Borders::TOP))
+            .block(
+                Block::default()
+                    .borders(Borders::TOP)
+                    .border_type(BorderType::Rounded),
+            )
             .style(Style::default().fg(Color::DarkGray))
             .alignment(Alignment::Center);
 

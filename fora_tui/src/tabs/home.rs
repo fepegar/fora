@@ -320,7 +320,11 @@ impl HomeTab {
         ])];
 
         let header = Paragraph::new(welcome_text)
-            .block(Block::default().borders(Borders::ALL))
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_type(BorderType::Rounded),
+            )
             .alignment(Alignment::Center);
 
         f.render_widget(header, area);
@@ -346,7 +350,8 @@ impl HomeTab {
                     Block::default()
                         .borders(Borders::ALL)
                         .title("📋 Recent Jobs")
-                        .border_style(border_style),
+                        .border_style(border_style)
+                        .border_type(BorderType::Rounded),
                 )
                 .style(Style::default().fg(Color::Gray))
                 .alignment(Alignment::Center)
@@ -389,10 +394,10 @@ impl HomeTab {
                 Block::default()
                     .borders(Borders::ALL)
                     .title("📋 Recent Jobs")
-                    .border_style(border_style),
+                    .border_style(border_style)
+                    .border_type(BorderType::Rounded),
             )
-            .highlight_style(Style::default().add_modifier(Modifier::REVERSED))
-            .highlight_symbol(if is_focused { ">> " } else { "   " });
+            .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
 
         f.render_stateful_widget(jobs_list, area, &mut self.jobs_list_state.clone());
 
@@ -433,7 +438,8 @@ impl HomeTab {
                     Block::default()
                         .borders(Borders::ALL)
                         .title("🧪 Recent Experiments")
-                        .border_style(border_style),
+                        .border_style(border_style)
+                        .border_type(BorderType::Rounded),
                 )
                 .style(Style::default().fg(Color::Gray))
                 .alignment(Alignment::Center)
@@ -473,10 +479,10 @@ impl HomeTab {
                 Block::default()
                     .borders(Borders::ALL)
                     .title("🧪 Recent Experiments")
-                    .border_style(border_style),
+                    .border_style(border_style)
+                    .border_type(BorderType::Rounded),
             )
-            .highlight_style(Style::default().add_modifier(Modifier::REVERSED))
-            .highlight_symbol(if is_focused { ">> " } else { "   " });
+            .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
 
         f.render_stateful_widget(
             experiments_list,

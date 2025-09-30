@@ -440,27 +440,52 @@ impl JobsTab {
             })
             .collect();
 
-        let title = if self.loading {
-            "Jobs (Loading...)"
+        // Different border configurations based on whether details pane is shown
+        let border_set = if self.show_details {
+            // When details pane is open, don't show right border and use connecting corners
+            let connecting_border_set = symbols::border::Set {
+                top_left: symbols::line::VERTICAL_RIGHT,
+                top_right: symbols::line::HORIZONTAL_DOWN,
+                bottom_right: symbols::line::HORIZONTAL_UP,
+                ..symbols::border::ROUNDED
+            };
+            connecting_border_set
         } else {
-            "Jobs"
+            // When details pane is closed, show all borders with normal corners
+            let normal_border_set = symbols::border::Set {
+                top_left: symbols::line::VERTICAL_RIGHT,
+                top_right: symbols::line::VERTICAL_LEFT,
+                ..symbols::border::ROUNDED
+            };
+            normal_border_set
         };
 
         let jobs_list = List::new(items)
-            .block(Block::default().borders(Borders::ALL).title(title))
-            .highlight_style(Style::default().add_modifier(Modifier::REVERSED))
-            .highlight_symbol(">> ");
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_set(border_set)
+                    .border_style(Style::default().fg(Color::Gray)),
+            )
+            .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
 
         f.render_stateful_widget(jobs_list, area, &mut self.list_state.clone());
     }
 
     fn render_job_details(&mut self, f: &mut Frame, area: Rect) {
+        // TODO: Share this somewhere
+        let top_border_set = symbols::border::Set {
+            top_left: symbols::line::VERTICAL_RIGHT,
+            top_right: symbols::line::VERTICAL_LEFT,
+            ..symbols::border::ROUNDED
+        };
+
         if let Some(details) = &self.job_details {
             // Create the scrollable content area and scrollbar area
             let scrollable_area = Rect {
                 x: area.x,
                 y: area.y,
-                width: area.width.saturating_sub(1),
+                width: area.width, // .saturating_sub(1)
                 height: area.height,
             };
             let scrollbar_area = Rect {
@@ -568,8 +593,9 @@ impl JobsTab {
             let paragraph = Paragraph::new(details_text)
                 .block(
                     Block::default()
-                        .borders(Borders::ALL)
-                        .title("Job Details (↑↓ to scroll)"),
+                        .borders(Borders::TOP | Borders::BOTTOM | Borders::RIGHT)
+                        .border_set(top_border_set)
+                        .border_style(Style::default().fg(Color::Gray)),
                 )
                 .wrap(Wrap { trim: true })
                 .scroll((self.details_scroll_position as u16, 0));
@@ -593,7 +619,12 @@ impl JobsTab {
             };
 
             let paragraph = Paragraph::new(loading_text)
-                .block(Block::default().borders(Borders::ALL).title("Job Details"))
+                .block(
+                    Block::default()
+                        .borders(Borders::TOP | Borders::BOTTOM | Borders::RIGHT)
+                        .border_set(top_border_set)
+                        .border_style(Style::default().fg(Color::Gray)),
+                )
                 .style(Style::default().fg(Color::Gray))
                 .alignment(Alignment::Center)
                 .wrap(Wrap { trim: true });

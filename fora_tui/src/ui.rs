@@ -4,10 +4,10 @@ use ratatui::{prelude::*, widgets::*};
 pub fn draw(f: &mut Frame, app: &mut App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Length(3), Constraint::Min(0)])
+        .constraints([Constraint::Length(2), Constraint::Min(0)])
         .split(f.size());
 
-    // Top bar with tabs
+    // Top bar with tabs (no border)
     draw_tabs(f, chunks[0], app);
 
     // Main content area - delegate to current tab
@@ -25,7 +25,12 @@ fn draw_tabs(f: &mut Frame, area: Rect, app: &mut App) {
         .unwrap_or(0);
 
     let tabs = Tabs::new(tab_names)
-        .block(Block::default().borders(Borders::ALL).title("Azure ML TUI"))
+        .block(
+            Block::default()
+                .borders(Borders::LEFT | Borders::RIGHT | Borders::TOP)
+                .border_style(Style::default().fg(Color::Gray))
+                .border_type(BorderType::Rounded),
+        )
         .select(selected_index)
         .style(Style::default().fg(Color::White))
         .highlight_style(
@@ -33,7 +38,8 @@ fn draw_tabs(f: &mut Frame, area: Rect, app: &mut App) {
                 .fg(Color::Yellow)
                 .add_modifier(Modifier::BOLD),
         )
-        .divider("|");
+        .divider("·");
+    // .divider(" | ");
 
     f.render_widget(tabs, area);
 }
