@@ -1,5 +1,5 @@
 use azure_core::error::Result as AzureResult;
-use azure_core::http::{Method, Pipeline, Request, Url};
+use azure_core::http::{Method, Pager, Pipeline, Request, Url};
 use azure_core::Error as AzureError;
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json;
@@ -127,7 +127,7 @@ impl AzureMLClient {
         tag: Option<&str>,
         list_view_type: Option<models::ListViewType>,
         properties: Option<&str>,
-    ) -> AzureResult<models::JobBaseResourceArmPaginatedResult> {
+    ) -> azure_core::Result<Pager<models::JobBaseResource>> {
         let mut url_str = format!(
             "{}/subscriptions/{}/resourceGroups/{}/providers/Microsoft.MachineLearningServices/workspaces/{}/jobs?api-version={}",
             self.endpoint, self.subscription_id, resource_group, workspace, self.api_version
@@ -169,6 +169,15 @@ impl AzureMLClient {
             )
         })?;
 
-        self.send(Method::Get, url, None::<()>).await
+        // Get the initial page
+        let response: models::JobBaseResourceArmPaginatedResult =
+            self.send(Method::Get, url, None::<()>).await?;
+
+        // Extract items from the response
+        let items = response.value.unwrap_or_default();
+
+        // For now, create a simple pager from the single page
+        // TODO: Implement proper pagination with next_link handling
+        Ok(Pager::from_single_page(items))
     }
 }

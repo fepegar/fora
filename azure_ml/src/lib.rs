@@ -3,7 +3,7 @@
 //! This crate provides a high-level client for interacting with Azure ML services.
 
 pub mod client;
-pub mod client_old;
+// pub mod client_old;
 pub mod models;
 
 // Re-export the main client
