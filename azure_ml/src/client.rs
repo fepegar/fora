@@ -1,5 +1,5 @@
 use azure_core::error::Result as AzureResult;
-use azure_core::http::{Context, Method, Pipeline, Request, Response, Url};
+use azure_core::http::{Method, Pipeline, Request, Url};
 use azure_core::Error as AzureError;
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json;
@@ -16,29 +16,55 @@ pub struct AzureMLClient {
 }
 
 impl AzureMLClient {
-    /// Generic send helper:
-    /// - TReq: serializable request body (Option)
-    /// - TResp: deserializable response body
+    /// Create a new Azure ML client
+    pub fn new(
+        endpoint: String,
+        subscription_id: String,
+        pipeline: Arc<Pipeline>,
+        api_version: Option<String>,
+    ) -> Self {
+        Self {
+            endpoint,
+            subscription_id,
+            pipeline,
+            api_version: api_version.unwrap_or_else(|| "2025-09-01".to_string()),
+        }
+    }
+
+    /// Create a new Azure ML client from pipeline (use azure_core to create the pipeline)
+    pub fn from_pipeline(
+        endpoint: String,
+        subscription_id: String,
+        pipeline: Pipeline,
+        api_version: Option<String>,
+    ) -> Self {
+        Self {
+            endpoint,
+            subscription_id,
+            pipeline: Arc::new(pipeline),
+            api_version: api_version.unwrap_or_else(|| "2025-09-01".to_string()),
+        }
+    }
+
+    /// Generic send helper for making HTTP requests
     pub async fn send<TReq, TResp>(
         &self,
         method: Method,
         url: Url,
-        body: Option<&TReq>,
-        ctx: Option<&Context>,
+        body: Option<TReq>,
     ) -> AzureResult<TResp>
     where
-        TReq: Serialize + Sync,
+        TReq: Serialize + Send + Sync,
         TResp: DeserializeOwned + Send + Sync + 'static,
     {
-        // Build request
         let mut req = Request::new(url, method);
 
-        // Set body if present and add header
+        // Set body if present
         if let Some(b) = body {
-            let bytes = serde_json::to_vec(b).map_err(|e| {
+            let bytes = serde_json::to_vec(&b).map_err(|e| {
                 AzureError::message(
                     azure_core::error::ErrorKind::DataConversion,
-                    format!("serialize body: {}", e),
+                    format!("Failed to serialize request body: {}", e),
                 )
             })?;
             req.set_body(bytes.into());
@@ -46,58 +72,103 @@ impl AzureMLClient {
                 .insert("content-type", "application/json".parse().unwrap());
         }
 
-        // Prepare context
-        let context = ctx.cloned().unwrap_or_default();
+        // Send request through pipeline
+        let response = self.pipeline.send(&mut req, &Default::default()).await?;
 
-        // Send through pipeline.
-        // NOTE: the exact pipeline API can differ across azure_core versions.
-        // Here we use a conceptual `send` that accepts `&mut Request` and `&Context`.
-        let resp: Response = self
-            .pipeline
-            .send(&mut req, &context) // adapt call if your azure_core API differs
-            .await
-            .map_err(|e| {
-                AzureError::message(azure_core::error::ErrorKind::Other, format!("{:?}", e))
-            })?;
-
-        // Read response body bytes
-        let body_bytes = resp.into_body().collect().await.map_err(|e| {
+        // Read response body
+        let body_bytes = response.into_body().collect().await.map_err(|e| {
             AzureError::message(
                 azure_core::error::ErrorKind::HttpResponse,
-                format!("{:?}", e),
+                format!("Failed to read response body: {}", e),
             )
         })?;
 
-        // Deserialize into the requested type
+        // Deserialize response
         let result: TResp = serde_json::from_slice(&body_bytes).map_err(|e| {
             AzureError::message(
                 azure_core::error::ErrorKind::DataConversion,
-                format!("deserialize: {}", e),
+                format!("Failed to deserialize response: {}", e),
             )
         })?;
 
         Ok(result)
     }
 
-    /// Example: very thin create_or_update_job that uses the generic send helper.
+    /// Create or update a job
     pub async fn create_or_update_job(
         &self,
         resource_group: &str,
         workspace: &str,
         job_id: &str,
-        body: &models::CreateJobRequest, // generated model
+        body: models::Job,
     ) -> AzureResult<models::JobBaseResource> {
         let url_str = format!(
             "{}/subscriptions/{}/resourceGroups/{}/providers/Microsoft.MachineLearningServices/workspaces/{}/jobs/{}?api-version={}",
             self.endpoint, self.subscription_id, resource_group, workspace, job_id, self.api_version
         );
+
         let url = Url::parse(&url_str).map_err(|e| {
             AzureError::message(
                 azure_core::error::ErrorKind::Other,
-                format!("url parse: {}", e),
+                format!("Invalid URL: {}", e),
             )
         })?;
 
-        self.send(Method::Put, url, Some(body), None).await
+        self.send(Method::Put, url, Some(body)).await
+    }
+
+    /// List jobs in the workspace
+    pub async fn list_jobs(
+        &self,
+        resource_group: &str,
+        workspace: &str,
+        skip: Option<i32>,
+        job_type: Option<&str>,
+        tag: Option<&str>,
+        list_view_type: Option<models::ListViewType>,
+        properties: Option<&str>,
+    ) -> AzureResult<models::JobBaseResourceArmPaginatedResult> {
+        let mut url_str = format!(
+            "{}/subscriptions/{}/resourceGroups/{}/providers/Microsoft.MachineLearningServices/workspaces/{}/jobs?api-version={}",
+            self.endpoint, self.subscription_id, resource_group, workspace, self.api_version
+        );
+
+        // Build query parameters
+        let mut query_params = Vec::new();
+
+        if let Some(skip_val) = skip {
+            query_params.push(format!("$skip={}", skip_val));
+        }
+
+        if let Some(job_type_val) = job_type {
+            query_params.push(format!("jobType={}", job_type_val));
+        }
+
+        if let Some(tag_val) = tag {
+            query_params.push(format!("tag={}", tag_val));
+        }
+
+        if let Some(list_view_type_val) = list_view_type {
+            query_params.push(format!("listViewType={}", list_view_type_val));
+        }
+
+        if let Some(properties_val) = properties {
+            query_params.push(format!("properties={}", properties_val));
+        }
+
+        // Append query parameters if any exist
+        if !query_params.is_empty() {
+            url_str.push('&');
+            url_str.push_str(&query_params.join("&"));
+        }
+
+        let url = Url::parse(&url_str).map_err(|e| {
+            AzureError::message(
+                azure_core::error::ErrorKind::Other,
+                format!("Invalid URL: {}", e),
+            )
+        })?;
+
+        self.send(Method::Get, url, None::<()>).await
     }
 }
