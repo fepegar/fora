@@ -10,9 +10,9 @@ resolver = "2"
 ratatui = "0.26"
 crossterm = "0.27"
 tokio = { version = "1.0", features = ["full"] }
-azure_core = "0.20"
-azure_identity = "0.20"
-azure_mgmt_machinelearningservices = "0.20"
+azure_core = "0.28"
+azure_identity = "0.28"
+azure_mgmt_machinelearningservices = "0.21"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 chrono = { version = "0.4", features = ["serde"] }

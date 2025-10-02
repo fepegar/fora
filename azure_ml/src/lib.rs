@@ -3,10 +3,12 @@
 //! This crate provides a high-level client for interacting with Azure ML services.
 
 pub mod client;
+pub mod client_old;
 pub mod models;
 
 // Re-export the main client
-pub use client::{AzureMLClient, AzureMLConfig};
+pub use client::AzureMLClient;
+// pub use client_old::{AzureMLClient, AzureMLConfig};
 
 // Re-export all models for convenience
 pub use models::*;

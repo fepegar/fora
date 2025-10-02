@@ -19,9 +19,6 @@ use std::env;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Enable logging
-    tracing_subscriber::init();
-
     // Get configuration from environment variables
     let subscription_id = env::var("AZURE_SUBSCRIPTION_ID")
         .expect("AZURE_SUBSCRIPTION_ID environment variable is required");
