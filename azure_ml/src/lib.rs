@@ -4,6 +4,7 @@
 
 pub mod client;
 // pub mod client_old;
+pub mod method_options;
 pub mod models;
 pub mod models_impl;
 

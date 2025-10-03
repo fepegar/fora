@@ -1,4 +1,5 @@
-use crate::models::{JobBaseResourceArmPaginatedResult, MLClientListJobsOptions};
+use crate::method_options::JobsListOptions;
+use crate::models::JobBaseResourceArmPaginatedResult;
 use azure_core::{
     credentials::TokenCredential,
     fmt::SafeDebug,
@@ -6,8 +7,7 @@ use azure_core::{
         check_success,
         pager::{PagerResult, PagerState},
         policies::{BearerTokenCredentialPolicy, Policy},
-        BufResponse, ClientOptions, Method, NoFormat, Pager, Pipeline, Request, RequestContent,
-        Response, Url,
+        BufResponse, ClientOptions, Method, Pager, Pipeline, Request, Url,
     },
     json, tracing, Result,
 };
@@ -15,9 +15,6 @@ use std::sync::Arc;
 
 #[tracing::client]
 pub struct MLClient {
-    pub(crate) subscription_id: String,
-    pub(crate) resource_group_name: String,
-    pub(crate) workspace_name: String,
     pub(crate) api_version: String,
     pub(crate) base_url: Url,
     pub(crate) pipeline: Pipeline,
@@ -25,8 +22,6 @@ pub struct MLClient {
 
 #[derive(Clone, SafeDebug)]
 pub struct MLClientOptions {
-    /// API version to use for the ML management endpoints.
-    pub api_version: String,
     /// ClientOptions for customizing the pipeline.
     pub client_options: ClientOptions,
 }
@@ -60,10 +55,7 @@ impl MLClient {
         base_url = base_url.join(&path)?;
 
         Ok(Self {
-            subscription_id,
-            resource_group_name,
-            workspace_name,
-            api_version: options.api_version,
+            api_version: String::from("2025-09-01"),
             base_url,
             pipeline: Pipeline::new(
                 option_env!("CARGO_PKG_NAME"),
@@ -82,7 +74,7 @@ impl MLClient {
     #[tracing::function("MachineLearning.listJobs")]
     pub fn list_jobs(
         &self,
-        options: Option<MLClientListJobsOptions<'_>>,
+        options: Option<JobsListOptions<'_>>,
     ) -> Result<Pager<JobBaseResourceArmPaginatedResult>> {
         let options = options.unwrap_or_default().into_owned();
         let pipeline = self.pipeline.clone();
@@ -136,7 +128,6 @@ impl MLClient {
 impl Default for MLClientOptions {
     fn default() -> Self {
         Self {
-            api_version: String::from("2025-09-01"),
             client_options: ClientOptions::default(),
         }
     }
