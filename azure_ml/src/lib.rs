@@ -5,9 +5,10 @@
 pub mod client;
 // pub mod client_old;
 pub mod models;
+pub mod models_impl;
 
 // Re-export the main client
-pub use client::AzureMLClient;
+pub use client::MLClient;
 // pub use client_old::{AzureMLClient, AzureMLConfig};
 
 // Re-export all models for convenience

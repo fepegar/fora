@@ -1,183 +1,143 @@
-use azure_core::error::Result as AzureResult;
-use azure_core::http::{Method, Pager, Pipeline, Request, Url};
-use azure_core::Error as AzureError;
-use serde::{de::DeserializeOwned, Serialize};
-use serde_json;
+use crate::models::{JobBaseResourceArmPaginatedResult, MLClientListJobsOptions};
+use azure_core::{
+    credentials::TokenCredential,
+    fmt::SafeDebug,
+    http::{
+        check_success,
+        pager::{PagerResult, PagerState},
+        policies::{BearerTokenCredentialPolicy, Policy},
+        BufResponse, ClientOptions, Method, NoFormat, Pager, Pipeline, Request, RequestContent,
+        Response, Url,
+    },
+    json, tracing, Result,
+};
 use std::sync::Arc;
 
-use crate::models;
-
-#[derive(Clone)]
-pub struct AzureMLClient {
-    endpoint: String,
-    subscription_id: String,
-    pipeline: Arc<Pipeline>,
-    api_version: String,
+#[tracing::client]
+pub struct MLClient {
+    pub(crate) subscription_id: String,
+    pub(crate) resource_group_name: String,
+    pub(crate) workspace_name: String,
+    pub(crate) api_version: String,
+    pub(crate) base_url: Url,
+    pub(crate) pipeline: Pipeline,
 }
 
-impl AzureMLClient {
-    /// Create a new Azure ML client
+#[derive(Clone, SafeDebug)]
+pub struct MLClientOptions {
+    /// API version to use for the ML management endpoints.
+    pub api_version: String,
+    /// ClientOptions for customizing the pipeline.
+    pub client_options: ClientOptions,
+}
+
+impl MLClient {
+    /// Creates a new MLClient, using Entra ID authentication.
+    #[tracing::new("MachineLearning")]
     pub fn new(
-        endpoint: String,
-        subscription_id: String,
-        pipeline: Arc<Pipeline>,
-        api_version: Option<String>,
-    ) -> Self {
-        Self {
-            endpoint,
-            subscription_id,
-            pipeline,
-            api_version: api_version.unwrap_or_else(|| "2025-09-01".to_string()),
-        }
-    }
+        subscription_id: impl Into<String>,
+        resource_group_name: impl Into<String>,
+        workspace_name: impl Into<String>,
+        credential: Arc<dyn TokenCredential>,
+        options: Option<MLClientOptions>,
+    ) -> Result<Self> {
+        let subscription_id = subscription_id.into();
+        let resource_group_name = resource_group_name.into();
+        let workspace_name = workspace_name.into();
 
-    /// Create a new Azure ML client from pipeline (use azure_core to create the pipeline)
-    pub fn from_pipeline(
-        endpoint: String,
-        subscription_id: String,
-        pipeline: Pipeline,
-        api_version: Option<String>,
-    ) -> Self {
-        Self {
-            endpoint,
-            subscription_id,
-            pipeline: Arc::new(pipeline),
-            api_version: api_version.unwrap_or_else(|| "2025-09-01".to_string()),
-        }
-    }
+        let options = options.unwrap_or_default();
+        let auth_policy: Arc<dyn Policy> = Arc::new(BearerTokenCredentialPolicy::new(
+            credential,
+            vec!["https://management.azure.com/.default"],
+        ));
 
-    /// Generic send helper for making HTTP requests
-    pub async fn send<TReq, TResp>(
-        &self,
-        method: Method,
-        url: Url,
-        body: Option<TReq>,
-    ) -> AzureResult<TResp>
-    where
-        TReq: Serialize + Send + Sync,
-        TResp: DeserializeOwned + Send + Sync + 'static,
-    {
-        let mut req = Request::new(url, method);
-
-        // Set body if present
-        if let Some(b) = body {
-            let bytes = serde_json::to_vec(&b).map_err(|e| {
-                AzureError::message(
-                    azure_core::error::ErrorKind::DataConversion,
-                    format!("Failed to serialize request body: {}", e),
-                )
-            })?;
-            req.set_body(bytes.into());
-            req.headers_mut()
-                .insert("content-type", "application/json".parse().unwrap());
-        }
-
-        // Send request through pipeline
-        let response = self.pipeline.send(&mut req, &Default::default()).await?;
-
-        // Read response body
-        let body_bytes = response.into_body().collect().await.map_err(|e| {
-            AzureError::message(
-                azure_core::error::ErrorKind::HttpResponse,
-                format!("Failed to read response body: {}", e),
-            )
-        })?;
-
-        // Deserialize response
-        let result: TResp = serde_json::from_slice(&body_bytes).map_err(|e| {
-            AzureError::message(
-                azure_core::error::ErrorKind::DataConversion,
-                format!("Failed to deserialize response: {}", e),
-            )
-        })?;
-
-        Ok(result)
-    }
-
-    /// Create or update a job
-    pub async fn create_or_update_job(
-        &self,
-        resource_group: &str,
-        workspace: &str,
-        job_id: &str,
-        body: models::Job,
-    ) -> AzureResult<models::JobBaseResource> {
-        let url_str = format!(
-            "{}/subscriptions/{}/resourceGroups/{}/providers/Microsoft.MachineLearningServices/workspaces/{}/jobs/{}?api-version={}",
-            self.endpoint, self.subscription_id, resource_group, workspace, job_id, self.api_version
+        // Construct the workspace base URL once
+        let mut base_url = Url::parse("https://management.azure.com/")?;
+        let path = format!(
+            "subscriptions/{}/resourceGroups/{}/providers/Microsoft.MachineLearningServices/workspaces/{}/",
+            subscription_id, resource_group_name, workspace_name
         );
+        base_url = base_url.join(&path)?;
 
-        let url = Url::parse(&url_str).map_err(|e| {
-            AzureError::message(
-                azure_core::error::ErrorKind::Other,
-                format!("Invalid URL: {}", e),
-            )
-        })?;
-
-        self.send(Method::Put, url, Some(body)).await
+        Ok(Self {
+            subscription_id,
+            resource_group_name,
+            workspace_name,
+            api_version: options.api_version,
+            base_url,
+            pipeline: Pipeline::new(
+                option_env!("CARGO_PKG_NAME"),
+                option_env!("CARGO_PKG_VERSION"),
+                options.client_options,
+                Vec::default(),
+                vec![auth_policy],
+                None,
+            ),
+        })
     }
 
-    /// List jobs in the workspace
-    pub async fn list_jobs(
+    /// Lists jobs in the configured workspace.
+    ///
+    /// GET {base_url}/jobs?api-version=2024-10-01
+    #[tracing::function("MachineLearning.listJobs")]
+    pub fn list_jobs(
         &self,
-        resource_group: &str,
-        workspace: &str,
-        skip: Option<i32>,
-        job_type: Option<&str>,
-        tag: Option<&str>,
-        list_view_type: Option<models::ListViewType>,
-        properties: Option<&str>,
-    ) -> azure_core::Result<Pager<models::JobBaseResource>> {
-        let mut url_str = format!(
-            "{}/subscriptions/{}/resourceGroups/{}/providers/Microsoft.MachineLearningServices/workspaces/{}/jobs?api-version={}",
-            self.endpoint, self.subscription_id, resource_group, workspace, self.api_version
-        );
+        options: Option<MLClientListJobsOptions<'_>>,
+    ) -> Result<Pager<JobBaseResourceArmPaginatedResult>> {
+        let options = options.unwrap_or_default().into_owned();
+        let pipeline = self.pipeline.clone();
 
-        // Build query parameters
-        let mut query_params = Vec::new();
+        // start URL from base_url
+        let mut first_url = self.base_url.join("jobs")?;
+        first_url
+            .query_pairs_mut()
+            .append_pair("api-version", &self.api_version);
 
-        if let Some(skip_val) = skip {
-            query_params.push(format!("$skip={}", skip_val));
+        let api_version = self.api_version.clone();
+        Ok(Pager::from_callback(move |next_link: PagerState<Url>| {
+            let url = match next_link {
+                PagerState::More(next_link) => {
+                    let qp = next_link
+                        .query_pairs()
+                        .filter(|(name, _)| name.ne("api-version"));
+                    let mut next_link = next_link.clone();
+                    next_link
+                        .query_pairs_mut()
+                        .clear()
+                        .extend_pairs(qp)
+                        .append_pair("api-version", &api_version);
+                    next_link
+                }
+                PagerState::Initial => first_url.clone(),
+            };
+            let mut request = Request::new(url, Method::Get);
+            request.insert_header("accept", "application/json");
+            let ctx = options.method_options.context.clone();
+            let pipeline = pipeline.clone();
+            async move {
+                let rsp = pipeline.send(&ctx, &mut request).await?;
+                let rsp = check_success(rsp).await?;
+                let (status, headers, body) = rsp.deconstruct();
+                let bytes = body.collect().await?;
+                let res: JobBaseResourceArmPaginatedResult = json::from_json(&bytes)?;
+                let rsp = BufResponse::from_bytes(status, headers, bytes).into();
+                Ok(match res.next_link {
+                    Some(next_link) if !next_link.is_empty() => PagerResult::More {
+                        response: rsp,
+                        continuation: next_link.parse()?,
+                    },
+                    _ => PagerResult::Done { response: rsp },
+                })
+            }
+        }))
+    }
+}
+
+impl Default for MLClientOptions {
+    fn default() -> Self {
+        Self {
+            api_version: String::from("2025-09-01"),
+            client_options: ClientOptions::default(),
         }
-
-        if let Some(job_type_val) = job_type {
-            query_params.push(format!("jobType={}", job_type_val));
-        }
-
-        if let Some(tag_val) = tag {
-            query_params.push(format!("tag={}", tag_val));
-        }
-
-        if let Some(list_view_type_val) = list_view_type {
-            query_params.push(format!("listViewType={}", list_view_type_val));
-        }
-
-        if let Some(properties_val) = properties {
-            query_params.push(format!("properties={}", properties_val));
-        }
-
-        // Append query parameters if any exist
-        if !query_params.is_empty() {
-            url_str.push('&');
-            url_str.push_str(&query_params.join("&"));
-        }
-
-        let url = Url::parse(&url_str).map_err(|e| {
-            AzureError::message(
-                azure_core::error::ErrorKind::Other,
-                format!("Invalid URL: {}", e),
-            )
-        })?;
-
-        // Get the initial page
-        let response: models::JobBaseResourceArmPaginatedResult =
-            self.send(Method::Get, url, None::<()>).await?;
-
-        // Extract items from the response
-        let items = response.value.unwrap_or_default();
-
-        // For now, create a simple pager from the single page
-        // TODO: Implement proper pagination with next_link handling
-        Ok(Pager::from_single_page(items))
     }
 }

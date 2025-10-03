@@ -12,7 +12,7 @@ use crate::models;
 use serde::{Deserialize, Serialize};
 
 /// JobBaseResource : Azure Resource Manager resource envelope.
-#[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct JobBaseResource {
     #[serde(rename = "properties")]
     pub properties: Box<models::Job>,
