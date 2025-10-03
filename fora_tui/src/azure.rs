@@ -1,11 +1,11 @@
-use azure_identity::DefaultAzureCredential;
+use azure_identity::DeveloperToolsCredential;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 #[derive(Debug)]
 pub struct AzureClient {
-    credential: Arc<DefaultAzureCredential>,
+    credential: Arc<DeveloperToolsCredential>,
     subscription_id: String,
     resource_group: String,
     workspace_name: String,
@@ -82,7 +82,7 @@ impl std::fmt::Display for JobStatus {
 
 impl AzureClient {
     pub async fn new() -> Result<Self, Box<dyn std::error::Error>> {
-        let credential = DefaultAzureCredential::create(Default::default())?;
+        let credential = DeveloperToolsCredential::new(Default::default())?;
 
         let subscription_id = std::env::var("AZURE_SUBSCRIPTION_ID")
             .unwrap_or_else(|_| "placeholder-subscription-id".to_string());
@@ -92,7 +92,7 @@ impl AzureClient {
             .unwrap_or_else(|_| "placeholder-workspace".to_string());
 
         Ok(Self {
-            credential: Arc::new(credential),
+            credential,
             subscription_id,
             resource_group,
             workspace_name,

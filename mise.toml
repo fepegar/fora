@@ -1,4 +1,17 @@
 [tools]
 "cargo:cargo-progenitor" = "latest"
 "npm:swagger-cli" = "latest"
-rust = "latest"
+rust = { version = "latest", components = "rustfmt,clippy" }
+
+[tasks.format]
+run = "cargo fmt --all"
+
+[tasks.format-check]
+run = "cargo fmt --all --check"
+
+[tasks.lint]
+description = "Run clippy (deny warnings)"
+run = "cargo clippy --all-targets --all-features -- -D warnings"
+
+[tasks.test]
+run = "cargo test --all --verbose"

@@ -13,6 +13,14 @@ use azure_core::{
 };
 use std::sync::Arc;
 
+macro_rules! append_query_param {
+    ($url:expr, $param_name:expr, $value:expr) => {
+        if let Some(val) = $value {
+            $url.query_pairs_mut().append_pair($param_name, &val);
+        }
+    };
+}
+
 #[tracing::client]
 pub struct MLClient {
     pub(crate) api_version: String,
@@ -70,7 +78,7 @@ impl MLClient {
 
     /// Lists jobs in the configured workspace.
     ///
-    /// GET {base_url}/jobs?api-version=2024-10-01
+    /// GET {base_url}/jobs?api-version=2025-09-01
     #[tracing::function("MachineLearning.listJobs")]
     pub fn list_jobs(
         &self,
@@ -84,6 +92,13 @@ impl MLClient {
         first_url
             .query_pairs_mut()
             .append_pair("api-version", &self.api_version);
+
+        // TODO: Is there a better way to do this?
+        append_query_param!(first_url, "$skip", options.dollar_skip);
+        append_query_param!(first_url, "job_type", options.job_type);
+        append_query_param!(first_url, "tag", options.tag);
+        append_query_param!(first_url, "list_view_type", options.list_view_type);
+        append_query_param!(first_url, "properties", options.properties);
 
         let api_version = self.api_version.clone();
         Ok(Pager::from_callback(move |next_link: PagerState<Url>| {
