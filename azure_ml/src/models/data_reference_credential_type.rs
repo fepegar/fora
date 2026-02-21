@@ -11,9 +11,10 @@
 use serde::{Deserialize, Serialize};
 
 /// DataReferenceCredentialType : Enum to determine the DataReference credentials type.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum DataReferenceCredentialType {
     #[serde(rename = "SAS")]
+    #[default]
     SAS,
     #[serde(rename = "DockerCredentials")]
     DockerCredentials,
@@ -21,12 +22,6 @@ pub enum DataReferenceCredentialType {
     ManagedIdentity,
     #[serde(rename = "NoCredentials")]
     NoCredentials,
-}
-
-impl Default for DataReferenceCredentialType {
-    fn default() -> Self {
-        Self::SAS
-    }
 }
 
 impl std::fmt::Display for DataReferenceCredentialType {

@@ -11,9 +11,10 @@
 use serde::{Deserialize, Serialize};
 
 /// RecurrenceFrequency : Enum to describe the frequency of a recurrence schedule
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum RecurrenceFrequency {
     #[serde(rename = "Minute")]
+    #[default]
     Minute,
     #[serde(rename = "Hour")]
     Hour,
@@ -23,12 +24,6 @@ pub enum RecurrenceFrequency {
     Week,
     #[serde(rename = "Month")]
     Month,
-}
-
-impl Default for RecurrenceFrequency {
-    fn default() -> Self {
-        Self::Minute
-    }
 }
 
 impl std::fmt::Display for RecurrenceFrequency {

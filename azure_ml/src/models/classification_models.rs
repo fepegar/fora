@@ -11,9 +11,10 @@
 use serde::{Deserialize, Serialize};
 
 /// ClassificationModels : Enum for all classification models supported by AutoML.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum ClassificationModels {
     #[serde(rename = "LogisticRegression")]
+    #[default]
     LogisticRegression,
     #[serde(rename = "SGD")]
     SGD,
@@ -39,12 +40,6 @@ pub enum ClassificationModels {
     GradientBoosting,
     #[serde(rename = "XGBoostClassifier")]
     XGBoostClassifier,
-}
-
-impl Default for ClassificationModels {
-    fn default() -> Self {
-        Self::LogisticRegression
-    }
 }
 
 impl std::fmt::Display for ClassificationModels {

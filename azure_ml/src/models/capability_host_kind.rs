@@ -11,16 +11,11 @@
 use serde::{Deserialize, Serialize};
 
 /// CapabilityHostKind : CapabilityHostKind enum
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum CapabilityHostKind {
     #[serde(rename = "Agents")]
+    #[default]
     Agents,
-}
-
-impl Default for CapabilityHostKind {
-    fn default() -> Self {
-        Self::Agents
-    }
 }
 
 impl std::fmt::Display for CapabilityHostKind {

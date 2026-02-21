@@ -11,16 +11,11 @@
 use serde::{Deserialize, Serialize};
 
 /// ServerlessInferenceEndpointAuthMode : ServerlessInferenceEndpointAuthMode enum
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum ServerlessInferenceEndpointAuthMode {
     #[serde(rename = "Key")]
+    #[default]
     Key,
-}
-
-impl Default for ServerlessInferenceEndpointAuthMode {
-    fn default() -> Self {
-        Self::Key
-    }
 }
 
 impl std::fmt::Display for ServerlessInferenceEndpointAuthMode {

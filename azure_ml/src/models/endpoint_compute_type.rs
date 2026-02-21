@@ -11,20 +11,15 @@
 use serde::{Deserialize, Serialize};
 
 /// EndpointComputeType : Enum to determine endpoint compute type.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum EndpointComputeType {
     #[serde(rename = "Managed")]
+    #[default]
     Managed,
     #[serde(rename = "Kubernetes")]
     Kubernetes,
     #[serde(rename = "AzureMLCompute")]
     AzureMLCompute,
-}
-
-impl Default for EndpointComputeType {
-    fn default() -> Self {
-        Self::Managed
-    }
 }
 
 impl std::fmt::Display for EndpointComputeType {

@@ -11,9 +11,10 @@
 use serde::{Deserialize, Serialize};
 
 /// MarketplaceSubscriptionProvisioningState : MarketplaceSubscriptionProvisioningState enum
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum MarketplaceSubscriptionProvisioningState {
     #[serde(rename = "Creating")]
+    #[default]
     Creating,
     #[serde(rename = "Deleting")]
     Deleting,
@@ -25,12 +26,6 @@ pub enum MarketplaceSubscriptionProvisioningState {
     Updating,
     #[serde(rename = "Canceled")]
     Canceled,
-}
-
-impl Default for MarketplaceSubscriptionProvisioningState {
-    fn default() -> Self {
-        Self::Creating
-    }
 }
 
 impl std::fmt::Display for MarketplaceSubscriptionProvisioningState {

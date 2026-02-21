@@ -11,18 +11,13 @@
 use serde::{Deserialize, Serialize};
 
 /// TargetLagsMode : Target lags selection modes.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum TargetLagsMode {
     #[serde(rename = "Auto")]
+    #[default]
     Auto,
     #[serde(rename = "Custom")]
     Custom,
-}
-
-impl Default for TargetLagsMode {
-    fn default() -> Self {
-        Self::Auto
-    }
 }
 
 impl std::fmt::Display for TargetLagsMode {

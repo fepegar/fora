@@ -11,9 +11,10 @@
 use serde::{Deserialize, Serialize};
 
 /// EndpointProvisioningState : State of endpoint provisioning.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum EndpointProvisioningState {
     #[serde(rename = "Creating")]
+    #[default]
     Creating,
     #[serde(rename = "Deleting")]
     Deleting,
@@ -25,12 +26,6 @@ pub enum EndpointProvisioningState {
     Updating,
     #[serde(rename = "Canceled")]
     Canceled,
-}
-
-impl Default for EndpointProvisioningState {
-    fn default() -> Self {
-        Self::Creating
-    }
 }
 
 impl std::fmt::Display for EndpointProvisioningState {

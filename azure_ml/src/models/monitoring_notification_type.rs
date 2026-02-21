@@ -11,16 +11,11 @@
 use serde::{Deserialize, Serialize};
 
 /// MonitoringNotificationType : MonitoringNotificationType enum
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum MonitoringNotificationType {
     #[serde(rename = "AmlNotification")]
+    #[default]
     AmlNotification,
-}
-
-impl Default for MonitoringNotificationType {
-    fn default() -> Self {
-        Self::AmlNotification
-    }
 }
 
 impl std::fmt::Display for MonitoringNotificationType {

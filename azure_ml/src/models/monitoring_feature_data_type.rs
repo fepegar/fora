@@ -11,18 +11,13 @@
 use serde::{Deserialize, Serialize};
 
 /// MonitoringFeatureDataType : MonitoringFeatureDataType enum
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum MonitoringFeatureDataType {
     #[serde(rename = "Numerical")]
+    #[default]
     Numerical,
     #[serde(rename = "Categorical")]
     Categorical,
-}
-
-impl Default for MonitoringFeatureDataType {
-    fn default() -> Self {
-        Self::Numerical
-    }
 }
 
 impl std::fmt::Display for MonitoringFeatureDataType {

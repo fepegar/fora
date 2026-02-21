@@ -11,16 +11,11 @@
 use serde::{Deserialize, Serialize};
 
 /// OneLakeArtifactType : Enum to determine OneLake artifact type.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum OneLakeArtifactType {
     #[serde(rename = "LakeHouse")]
+    #[default]
     LakeHouse,
-}
-
-impl Default for OneLakeArtifactType {
-    fn default() -> Self {
-        Self::LakeHouse
-    }
 }
 
 impl std::fmt::Display for OneLakeArtifactType {

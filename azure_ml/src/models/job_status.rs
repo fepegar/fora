@@ -11,9 +11,10 @@
 use serde::{Deserialize, Serialize};
 
 /// JobStatus : The status of a job.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum JobStatus {
     #[serde(rename = "NotStarted")]
+    #[default]
     NotStarted,
     #[serde(rename = "Starting")]
     Starting,
@@ -41,12 +42,6 @@ pub enum JobStatus {
     Paused,
     #[serde(rename = "Unknown")]
     Unknown,
-}
-
-impl Default for JobStatus {
-    fn default() -> Self {
-        Self::NotStarted
-    }
 }
 
 impl std::fmt::Display for JobStatus {

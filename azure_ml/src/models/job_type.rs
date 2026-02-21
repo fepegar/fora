@@ -11,9 +11,10 @@
 use serde::{Deserialize, Serialize};
 
 /// JobType : Enum to determine the type of job.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum JobType {
     #[serde(rename = "AutoML")]
+    #[default]
     AutoML,
     #[serde(rename = "Command")]
     Command,
@@ -23,12 +24,6 @@ pub enum JobType {
     Pipeline,
     #[serde(rename = "Spark")]
     Spark,
-}
-
-impl Default for JobType {
-    fn default() -> Self {
-        Self::AutoML
-    }
 }
 
 impl std::fmt::Display for JobType {

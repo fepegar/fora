@@ -13,9 +13,10 @@ use serde::{Deserialize, Serialize};
 /// StackMetaLearnerType : The meta-learner is a model trained on the output of the individual heterogeneous models.
 /// Default meta-learners are LogisticRegression for classification tasks (or LogisticRegressionCV if cross-validation is enabled) and ElasticNet for regression/forecasting tasks (or ElasticNetCV if cross-validation is enabled).
 /// This parameter can be one of the following strings: LogisticRegression, LogisticRegressionCV, LightGBMClassifier, ElasticNet, ElasticNetCV, LightGBMRegressor, or LinearRegression
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum StackMetaLearnerType {
     #[serde(rename = "None")]
+    #[default]
     None,
     #[serde(rename = "LogisticRegression")]
     LogisticRegression,
@@ -31,12 +32,6 @@ pub enum StackMetaLearnerType {
     LightGBMRegressor,
     #[serde(rename = "LinearRegression")]
     LinearRegression,
-}
-
-impl Default for StackMetaLearnerType {
-    fn default() -> Self {
-        Self::None
-    }
 }
 
 impl std::fmt::Display for StackMetaLearnerType {

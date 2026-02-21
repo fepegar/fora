@@ -11,16 +11,11 @@
 use serde::{Deserialize, Serialize};
 
 /// NodesValueType : The enumerated types for the nodes value
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum NodesValueType {
     #[serde(rename = "All")]
+    #[default]
     All,
-}
-
-impl Default for NodesValueType {
-    fn default() -> Self {
-        Self::All
-    }
 }
 
 impl std::fmt::Display for NodesValueType {

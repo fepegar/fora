@@ -11,9 +11,10 @@
 use serde::{Deserialize, Serialize};
 
 /// MonitoringSignalType : MonitoringSignalType enum
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum MonitoringSignalType {
     #[serde(rename = "DataDrift")]
+    #[default]
     DataDrift,
     #[serde(rename = "PredictionDrift")]
     PredictionDrift,
@@ -23,12 +24,6 @@ pub enum MonitoringSignalType {
     FeatureAttributionDrift,
     #[serde(rename = "Custom")]
     Custom,
-}
-
-impl Default for MonitoringSignalType {
-    fn default() -> Self {
-        Self::DataDrift
-    }
 }
 
 impl std::fmt::Display for MonitoringSignalType {

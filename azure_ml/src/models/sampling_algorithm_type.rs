@@ -11,20 +11,15 @@
 use serde::{Deserialize, Serialize};
 
 /// SamplingAlgorithmType : SamplingAlgorithmType enum
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum SamplingAlgorithmType {
     #[serde(rename = "Grid")]
+    #[default]
     Grid,
     #[serde(rename = "Random")]
     Random,
     #[serde(rename = "Bayesian")]
     Bayesian,
-}
-
-impl Default for SamplingAlgorithmType {
-    fn default() -> Self {
-        Self::Grid
-    }
 }
 
 impl std::fmt::Display for SamplingAlgorithmType {

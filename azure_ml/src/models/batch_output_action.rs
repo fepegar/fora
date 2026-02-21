@@ -11,18 +11,13 @@
 use serde::{Deserialize, Serialize};
 
 /// BatchOutputAction : Enum to determine how batch inferencing will handle output
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum BatchOutputAction {
     #[serde(rename = "SummaryOnly")]
+    #[default]
     SummaryOnly,
     #[serde(rename = "AppendRow")]
     AppendRow,
-}
-
-impl Default for BatchOutputAction {
-    fn default() -> Self {
-        Self::SummaryOnly
-    }
 }
 
 impl std::fmt::Display for BatchOutputAction {

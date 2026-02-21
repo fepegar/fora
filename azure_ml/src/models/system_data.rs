@@ -47,9 +47,10 @@ impl SystemData {
     }
 }
 /// The type of identity that created the resource.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Default)]
 pub enum CreatedByType {
     #[serde(rename = "User")]
+    #[default]
     User,
     #[serde(rename = "Application")]
     Application,
@@ -59,15 +60,11 @@ pub enum CreatedByType {
     Key,
 }
 
-impl Default for CreatedByType {
-    fn default() -> CreatedByType {
-        Self::User
-    }
-}
 /// The type of identity that last modified the resource.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Default)]
 pub enum LastModifiedByType {
     #[serde(rename = "User")]
+    #[default]
     User,
     #[serde(rename = "Application")]
     Application,
@@ -75,10 +72,4 @@ pub enum LastModifiedByType {
     ManagedIdentity,
     #[serde(rename = "Key")]
     Key,
-}
-
-impl Default for LastModifiedByType {
-    fn default() -> LastModifiedByType {
-        Self::User
-    }
 }

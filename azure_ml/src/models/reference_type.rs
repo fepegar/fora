@@ -11,20 +11,15 @@
 use serde::{Deserialize, Serialize};
 
 /// ReferenceType : Enum to determine which reference method to use for an asset.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum ReferenceType {
     #[serde(rename = "Id")]
+    #[default]
     Id,
     #[serde(rename = "DataPath")]
     DataPath,
     #[serde(rename = "OutputPath")]
     OutputPath,
-}
-
-impl Default for ReferenceType {
-    fn default() -> Self {
-        Self::Id
-    }
 }
 
 impl std::fmt::Display for ReferenceType {

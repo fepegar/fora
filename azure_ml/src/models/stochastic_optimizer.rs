@@ -11,9 +11,10 @@
 use serde::{Deserialize, Serialize};
 
 /// StochasticOptimizer : Stochastic optimizer for image models.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum StochasticOptimizer {
     #[serde(rename = "None")]
+    #[default]
     None,
     #[serde(rename = "Sgd")]
     Sgd,
@@ -21,12 +22,6 @@ pub enum StochasticOptimizer {
     Adam,
     #[serde(rename = "Adamw")]
     Adamw,
-}
-
-impl Default for StochasticOptimizer {
-    fn default() -> Self {
-        Self::None
-    }
 }
 
 impl std::fmt::Display for StochasticOptimizer {

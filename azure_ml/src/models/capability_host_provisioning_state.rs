@@ -11,9 +11,10 @@
 use serde::{Deserialize, Serialize};
 
 /// CapabilityHostProvisioningState : Provisioning state of capability host.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum CapabilityHostProvisioningState {
     #[serde(rename = "Succeeded")]
+    #[default]
     Succeeded,
     #[serde(rename = "Failed")]
     Failed,
@@ -25,12 +26,6 @@ pub enum CapabilityHostProvisioningState {
     Updating,
     #[serde(rename = "Deleting")]
     Deleting,
-}
-
-impl Default for CapabilityHostProvisioningState {
-    fn default() -> Self {
-        Self::Succeeded
-    }
 }
 
 impl std::fmt::Display for CapabilityHostProvisioningState {

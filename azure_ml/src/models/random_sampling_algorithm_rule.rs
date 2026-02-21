@@ -11,18 +11,13 @@
 use serde::{Deserialize, Serialize};
 
 /// RandomSamplingAlgorithmRule : The specific type of random algorithm
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum RandomSamplingAlgorithmRule {
     #[serde(rename = "Random")]
+    #[default]
     Random,
     #[serde(rename = "Sobol")]
     Sobol,
-}
-
-impl Default for RandomSamplingAlgorithmRule {
-    fn default() -> Self {
-        Self::Random
-    }
 }
 
 impl std::fmt::Display for RandomSamplingAlgorithmRule {

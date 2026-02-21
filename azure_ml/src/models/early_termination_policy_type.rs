@@ -11,20 +11,15 @@
 use serde::{Deserialize, Serialize};
 
 /// EarlyTerminationPolicyType : EarlyTerminationPolicyType enum
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum EarlyTerminationPolicyType {
     #[serde(rename = "Bandit")]
+    #[default]
     Bandit,
     #[serde(rename = "MedianStopping")]
     MedianStopping,
     #[serde(rename = "TruncationSelection")]
     TruncationSelection,
-}
-
-impl Default for EarlyTerminationPolicyType {
-    fn default() -> Self {
-        Self::Bandit
-    }
 }
 
 impl std::fmt::Display for EarlyTerminationPolicyType {

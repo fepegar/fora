@@ -11,20 +11,15 @@
 use serde::{Deserialize, Serialize};
 
 /// NumericalDataQualityMetric : NumericalDataQualityMetric enum
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum NumericalDataQualityMetric {
     #[serde(rename = "NullValueRate")]
+    #[default]
     NullValueRate,
     #[serde(rename = "DataTypeErrorRate")]
     DataTypeErrorRate,
     #[serde(rename = "OutOfBoundsRate")]
     OutOfBoundsRate,
-}
-
-impl Default for NumericalDataQualityMetric {
-    fn default() -> Self {
-        Self::NullValueRate
-    }
 }
 
 impl std::fmt::Display for NumericalDataQualityMetric {

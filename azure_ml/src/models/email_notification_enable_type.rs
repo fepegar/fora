@@ -11,20 +11,15 @@
 use serde::{Deserialize, Serialize};
 
 /// EmailNotificationEnableType : Enum to determine the email notification type.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum EmailNotificationEnableType {
     #[serde(rename = "JobCompleted")]
+    #[default]
     JobCompleted,
     #[serde(rename = "JobFailed")]
     JobFailed,
     #[serde(rename = "JobCancelled")]
     JobCancelled,
-}
-
-impl Default for EmailNotificationEnableType {
-    fn default() -> Self {
-        Self::JobCompleted
-    }
 }
 
 impl std::fmt::Display for EmailNotificationEnableType {

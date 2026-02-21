@@ -11,20 +11,15 @@
 use serde::{Deserialize, Serialize};
 
 /// ServiceDataAccessAuthIdentity : ServiceDataAccessAuthIdentity enum
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum ServiceDataAccessAuthIdentity {
     #[serde(rename = "None")]
+    #[default]
     None,
     #[serde(rename = "WorkspaceSystemAssignedIdentity")]
     WorkspaceSystemAssignedIdentity,
     #[serde(rename = "WorkspaceUserAssignedIdentity")]
     WorkspaceUserAssignedIdentity,
-}
-
-impl Default for ServiceDataAccessAuthIdentity {
-    fn default() -> Self {
-        Self::None
-    }
 }
 
 impl std::fmt::Display for ServiceDataAccessAuthIdentity {

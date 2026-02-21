@@ -11,9 +11,10 @@
 use serde::{Deserialize, Serialize};
 
 /// ShortSeriesHandlingConfiguration : The parameter defining how if AutoML should handle short time series.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum ShortSeriesHandlingConfiguration {
     #[serde(rename = "None")]
+    #[default]
     None,
     #[serde(rename = "Auto")]
     Auto,
@@ -21,12 +22,6 @@ pub enum ShortSeriesHandlingConfiguration {
     Pad,
     #[serde(rename = "Drop")]
     Drop,
-}
-
-impl Default for ShortSeriesHandlingConfiguration {
-    fn default() -> Self {
-        Self::None
-    }
 }
 
 impl std::fmt::Display for ShortSeriesHandlingConfiguration {

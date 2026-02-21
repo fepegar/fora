@@ -11,20 +11,15 @@
 use serde::{Deserialize, Serialize};
 
 /// LearningRateScheduler : Learning rate scheduler enum.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum LearningRateScheduler {
     #[serde(rename = "None")]
+    #[default]
     None,
     #[serde(rename = "WarmupCosine")]
     WarmupCosine,
     #[serde(rename = "Step")]
     Step,
-}
-
-impl Default for LearningRateScheduler {
-    fn default() -> Self {
-        Self::None
-    }
 }
 
 impl std::fmt::Display for LearningRateScheduler {

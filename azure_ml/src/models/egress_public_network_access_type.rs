@@ -11,18 +11,13 @@
 use serde::{Deserialize, Serialize};
 
 /// EgressPublicNetworkAccessType : Enum to determine whether PublicNetworkAccess is Enabled or Disabled for egress of a deployment.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum EgressPublicNetworkAccessType {
     #[serde(rename = "Enabled")]
+    #[default]
     Enabled,
     #[serde(rename = "Disabled")]
     Disabled,
-}
-
-impl Default for EgressPublicNetworkAccessType {
-    fn default() -> Self {
-        Self::Enabled
-    }
 }
 
 impl std::fmt::Display for EgressPublicNetworkAccessType {

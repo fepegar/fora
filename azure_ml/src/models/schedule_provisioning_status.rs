@@ -11,9 +11,10 @@
 use serde::{Deserialize, Serialize};
 
 /// ScheduleProvisioningStatus : ScheduleProvisioningStatus enum
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum ScheduleProvisioningStatus {
     #[serde(rename = "Creating")]
+    #[default]
     Creating,
     #[serde(rename = "Updating")]
     Updating,
@@ -25,12 +26,6 @@ pub enum ScheduleProvisioningStatus {
     Failed,
     #[serde(rename = "Canceled")]
     Canceled,
-}
-
-impl Default for ScheduleProvisioningStatus {
-    fn default() -> Self {
-        Self::Creating
-    }
 }
 
 impl std::fmt::Display for ScheduleProvisioningStatus {

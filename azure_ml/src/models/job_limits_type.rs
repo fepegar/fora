@@ -11,18 +11,13 @@
 use serde::{Deserialize, Serialize};
 
 /// JobLimitsType : JobLimitsType enum
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum JobLimitsType {
     #[serde(rename = "Command")]
+    #[default]
     Command,
     #[serde(rename = "Sweep")]
     Sweep,
-}
-
-impl Default for JobLimitsType {
-    fn default() -> Self {
-        Self::Command
-    }
 }
 
 impl std::fmt::Display for JobLimitsType {

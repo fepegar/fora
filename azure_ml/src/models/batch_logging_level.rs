@@ -13,20 +13,15 @@ use serde::{Deserialize, Serialize};
 /// BatchLoggingLevel : Log verbosity for batch inferencing.
 /// Increasing verbosity order for logging is : Warning, Info and Debug.
 /// The default value is Info.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum BatchLoggingLevel {
     #[serde(rename = "Info")]
+    #[default]
     Info,
     #[serde(rename = "Warning")]
     Warning,
     #[serde(rename = "Debug")]
     Debug,
-}
-
-impl Default for BatchLoggingLevel {
-    fn default() -> Self {
-        Self::Info
-    }
 }
 
 impl std::fmt::Display for BatchLoggingLevel {

@@ -11,18 +11,13 @@
 use serde::{Deserialize, Serialize};
 
 /// TargetRollingWindowSizeMode : Target rolling windows size mode.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum TargetRollingWindowSizeMode {
     #[serde(rename = "Auto")]
+    #[default]
     Auto,
     #[serde(rename = "Custom")]
     Custom,
-}
-
-impl Default for TargetRollingWindowSizeMode {
-    fn default() -> Self {
-        Self::Auto
-    }
 }
 
 impl std::fmt::Display for TargetRollingWindowSizeMode {

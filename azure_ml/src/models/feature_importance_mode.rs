@@ -11,18 +11,13 @@
 use serde::{Deserialize, Serialize};
 
 /// FeatureImportanceMode : The mode of operation for computing feature importance.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum FeatureImportanceMode {
     #[serde(rename = "Disabled")]
+    #[default]
     Disabled,
     #[serde(rename = "Enabled")]
     Enabled,
-}
-
-impl Default for FeatureImportanceMode {
-    fn default() -> Self {
-        Self::Disabled
-    }
 }
 
 impl std::fmt::Display for FeatureImportanceMode {

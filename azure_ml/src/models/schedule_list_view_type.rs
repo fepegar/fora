@@ -11,20 +11,15 @@
 use serde::{Deserialize, Serialize};
 
 /// ScheduleListViewType : ScheduleListViewType enum
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum ScheduleListViewType {
     #[serde(rename = "EnabledOnly")]
+    #[default]
     EnabledOnly,
     #[serde(rename = "DisabledOnly")]
     DisabledOnly,
     #[serde(rename = "All")]
     All,
-}
-
-impl Default for ScheduleListViewType {
-    fn default() -> Self {
-        Self::EnabledOnly
-    }
 }
 
 impl std::fmt::Display for ScheduleListViewType {

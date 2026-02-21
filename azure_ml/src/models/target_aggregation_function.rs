@@ -11,9 +11,10 @@
 use serde::{Deserialize, Serialize};
 
 /// TargetAggregationFunction : Target aggregate function.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum TargetAggregationFunction {
     #[serde(rename = "None")]
+    #[default]
     None,
     #[serde(rename = "Sum")]
     Sum,
@@ -23,12 +24,6 @@ pub enum TargetAggregationFunction {
     Min,
     #[serde(rename = "Mean")]
     Mean,
-}
-
-impl Default for TargetAggregationFunction {
-    fn default() -> Self {
-        Self::None
-    }
 }
 
 impl std::fmt::Display for TargetAggregationFunction {

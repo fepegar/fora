@@ -11,9 +11,10 @@
 use serde::{Deserialize, Serialize};
 
 /// SecretsType : Enum to determine the datastore secrets type.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum SecretsType {
     #[serde(rename = "AccountKey")]
+    #[default]
     AccountKey,
     #[serde(rename = "Certificate")]
     Certificate,
@@ -21,12 +22,6 @@ pub enum SecretsType {
     Sas,
     #[serde(rename = "ServicePrincipal")]
     ServicePrincipal,
-}
-
-impl Default for SecretsType {
-    fn default() -> Self {
-        Self::AccountKey
-    }
 }
 
 impl std::fmt::Display for SecretsType {

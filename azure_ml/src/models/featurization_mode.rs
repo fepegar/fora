@@ -11,20 +11,15 @@
 use serde::{Deserialize, Serialize};
 
 /// FeaturizationMode : Featurization mode - determines data featurization mode.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum FeaturizationMode {
     #[serde(rename = "Auto")]
+    #[default]
     Auto,
     #[serde(rename = "Custom")]
     Custom,
     #[serde(rename = "Off")]
     Off,
-}
-
-impl Default for FeaturizationMode {
-    fn default() -> Self {
-        Self::Auto
-    }
 }
 
 impl std::fmt::Display for FeaturizationMode {

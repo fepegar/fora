@@ -11,9 +11,10 @@
 use serde::{Deserialize, Serialize};
 
 /// WeekDay : Enum of weekday
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum WeekDay {
     #[serde(rename = "Monday")]
+    #[default]
     Monday,
     #[serde(rename = "Tuesday")]
     Tuesday,
@@ -27,12 +28,6 @@ pub enum WeekDay {
     Saturday,
     #[serde(rename = "Sunday")]
     Sunday,
-}
-
-impl Default for WeekDay {
-    fn default() -> Self {
-        Self::Monday
-    }
 }
 
 impl std::fmt::Display for WeekDay {

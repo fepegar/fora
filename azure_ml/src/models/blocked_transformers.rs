@@ -11,9 +11,10 @@
 use serde::{Deserialize, Serialize};
 
 /// BlockedTransformers : Enum for all classification models supported by AutoML.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum BlockedTransformers {
     #[serde(rename = "TextTargetEncoder")]
+    #[default]
     TextTargetEncoder,
     #[serde(rename = "OneHotEncoder")]
     OneHotEncoder,
@@ -33,12 +34,6 @@ pub enum BlockedTransformers {
     CountVectorizer,
     #[serde(rename = "HashOneHotEncoder")]
     HashOneHotEncoder,
-}
-
-impl Default for BlockedTransformers {
-    fn default() -> Self {
-        Self::TextTargetEncoder
-    }
 }
 
 impl std::fmt::Display for BlockedTransformers {

@@ -11,9 +11,10 @@
 use serde::{Deserialize, Serialize};
 
 /// InputDeliveryMode : Enum to determine the input data delivery mode.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum InputDeliveryMode {
     #[serde(rename = "ReadOnlyMount")]
+    #[default]
     ReadOnlyMount,
     #[serde(rename = "ReadWriteMount")]
     ReadWriteMount,
@@ -25,12 +26,6 @@ pub enum InputDeliveryMode {
     EvalMount,
     #[serde(rename = "EvalDownload")]
     EvalDownload,
-}
-
-impl Default for InputDeliveryMode {
-    fn default() -> Self {
-        Self::ReadOnlyMount
-    }
 }
 
 impl std::fmt::Display for InputDeliveryMode {

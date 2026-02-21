@@ -11,9 +11,10 @@
 use serde::{Deserialize, Serialize};
 
 /// FeatureDataType : FeatureDataType enum
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum FeatureDataType {
     #[serde(rename = "String")]
+    #[default]
     String,
     #[serde(rename = "Integer")]
     Integer,
@@ -29,12 +30,6 @@ pub enum FeatureDataType {
     Datetime,
     #[serde(rename = "Boolean")]
     Boolean,
-}
-
-impl Default for FeatureDataType {
-    fn default() -> Self {
-        Self::String
-    }
 }
 
 impl std::fmt::Display for FeatureDataType {

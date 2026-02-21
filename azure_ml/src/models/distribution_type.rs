@@ -11,20 +11,15 @@
 use serde::{Deserialize, Serialize};
 
 /// DistributionType : Enum to determine the job distribution type.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum DistributionType {
     #[serde(rename = "PyTorch")]
+    #[default]
     PyTorch,
     #[serde(rename = "TensorFlow")]
     TensorFlow,
     #[serde(rename = "Mpi")]
     Mpi,
-}
-
-impl Default for DistributionType {
-    fn default() -> Self {
-        Self::PyTorch
-    }
 }
 
 impl std::fmt::Display for DistributionType {

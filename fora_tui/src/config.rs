@@ -3,23 +3,25 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Config {
     pub azure: AzureConfig,
     pub ui: UiConfig,
     pub cache: CacheConfig,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct AzureConfig {
     pub subscription_id: Option<String>,
     pub resource_group: Option<String>,
     pub workspace_name: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct UiConfig {
+    #[serde(default)]
     pub refresh_interval_seconds: u64,
+    #[serde(default)]
     pub max_items_per_page: usize,
 }
 
@@ -30,34 +32,7 @@ pub struct CacheConfig {
     pub ttl_seconds: u64,
 }
 
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            azure: AzureConfig::default(),
-            ui: UiConfig::default(),
-            cache: CacheConfig::default(),
-        }
-    }
-}
 
-impl Default for AzureConfig {
-    fn default() -> Self {
-        Self {
-            subscription_id: None,
-            resource_group: None,
-            workspace_name: None,
-        }
-    }
-}
-
-impl Default for UiConfig {
-    fn default() -> Self {
-        Self {
-            refresh_interval_seconds: 30,
-            max_items_per_page: 50,
-        }
-    }
-}
 
 impl Default for CacheConfig {
     fn default() -> Self {

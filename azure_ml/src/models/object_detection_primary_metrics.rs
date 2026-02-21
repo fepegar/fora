@@ -11,16 +11,11 @@
 use serde::{Deserialize, Serialize};
 
 /// ObjectDetectionPrimaryMetrics : Primary metrics for Image ObjectDetection task.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum ObjectDetectionPrimaryMetrics {
     #[serde(rename = "MeanAveragePrecision")]
+    #[default]
     MeanAveragePrecision,
-}
-
-impl Default for ObjectDetectionPrimaryMetrics {
-    fn default() -> Self {
-        Self::MeanAveragePrecision
-    }
 }
 
 impl std::fmt::Display for ObjectDetectionPrimaryMetrics {

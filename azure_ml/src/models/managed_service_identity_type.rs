@@ -12,9 +12,10 @@ use serde::{Deserialize, Serialize};
 
 /// ManagedServiceIdentityType : Type of managed service identity (where both SystemAssigned and UserAssigned types are allowed).
 /// Type of managed service identity (where both SystemAssigned and UserAssigned types are allowed).
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Default)]
 pub enum ManagedServiceIdentityType {
     #[serde(rename = "None")]
+    #[default]
     None,
     #[serde(rename = "SystemAssigned")]
     SystemAssigned,
@@ -32,11 +33,5 @@ impl std::fmt::Display for ManagedServiceIdentityType {
             Self::UserAssigned => write!(f, "UserAssigned"),
             Self::SystemAssignedCommaUserAssigned => write!(f, "SystemAssigned,UserAssigned"),
         }
-    }
-}
-
-impl Default for ManagedServiceIdentityType {
-    fn default() -> ManagedServiceIdentityType {
-        Self::None
     }
 }

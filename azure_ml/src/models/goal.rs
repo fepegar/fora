@@ -11,18 +11,13 @@
 use serde::{Deserialize, Serialize};
 
 /// Goal : Defines supported metric goals for hyperparameter tuning
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum Goal {
     #[serde(rename = "Minimize")]
+    #[default]
     Minimize,
     #[serde(rename = "Maximize")]
     Maximize,
-}
-
-impl Default for Goal {
-    fn default() -> Self {
-        Self::Minimize
-    }
 }
 
 impl std::fmt::Display for Goal {

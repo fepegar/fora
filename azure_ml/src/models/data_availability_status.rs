@@ -11,9 +11,10 @@
 use serde::{Deserialize, Serialize};
 
 /// DataAvailabilityStatus : DataAvailabilityStatus enum
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum DataAvailabilityStatus {
     #[serde(rename = "None")]
+    #[default]
     None,
     #[serde(rename = "Pending")]
     Pending,
@@ -21,12 +22,6 @@ pub enum DataAvailabilityStatus {
     Incomplete,
     #[serde(rename = "Complete")]
     Complete,
-}
-
-impl Default for DataAvailabilityStatus {
-    fn default() -> Self {
-        Self::None
-    }
 }
 
 impl std::fmt::Display for DataAvailabilityStatus {

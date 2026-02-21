@@ -11,20 +11,15 @@
 use serde::{Deserialize, Serialize};
 
 /// OutputDeliveryMode : Output data delivery mode enums.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum OutputDeliveryMode {
     #[serde(rename = "ReadWriteMount")]
+    #[default]
     ReadWriteMount,
     #[serde(rename = "Upload")]
     Upload,
     #[serde(rename = "Direct")]
     Direct,
-}
-
-impl Default for OutputDeliveryMode {
-    fn default() -> Self {
-        Self::ReadWriteMount
-    }
 }
 
 impl std::fmt::Display for OutputDeliveryMode {

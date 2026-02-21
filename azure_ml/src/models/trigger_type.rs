@@ -11,18 +11,13 @@
 use serde::{Deserialize, Serialize};
 
 /// TriggerType : TriggerType enum
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum TriggerType {
     #[serde(rename = "Recurrence")]
+    #[default]
     Recurrence,
     #[serde(rename = "Cron")]
     Cron,
-}
-
-impl Default for TriggerType {
-    fn default() -> Self {
-        Self::Recurrence
-    }
 }
 
 impl std::fmt::Display for TriggerType {

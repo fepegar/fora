@@ -11,18 +11,13 @@
 use serde::{Deserialize, Serialize};
 
 /// PendingUploadType : Type of storage to use for the pending upload location
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum PendingUploadType {
     #[serde(rename = "None")]
+    #[default]
     None,
     #[serde(rename = "TemporaryBlobReference")]
     TemporaryBlobReference,
-}
-
-impl Default for PendingUploadType {
-    fn default() -> Self {
-        Self::None
-    }
 }
 
 impl std::fmt::Display for PendingUploadType {

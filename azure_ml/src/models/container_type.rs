@@ -11,18 +11,13 @@
 use serde::{Deserialize, Serialize};
 
 /// ContainerType : ContainerType enum
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum ContainerType {
     #[serde(rename = "StorageInitializer")]
+    #[default]
     StorageInitializer,
     #[serde(rename = "InferenceServer")]
     InferenceServer,
-}
-
-impl Default for ContainerType {
-    fn default() -> Self {
-        Self::StorageInitializer
-    }
 }
 
 impl std::fmt::Display for ContainerType {

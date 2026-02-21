@@ -11,18 +11,13 @@
 use serde::{Deserialize, Serialize};
 
 /// DataCollectionMode : DataCollectionMode enum
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum DataCollectionMode {
     #[serde(rename = "Enabled")]
+    #[default]
     Enabled,
     #[serde(rename = "Disabled")]
     Disabled,
-}
-
-impl Default for DataCollectionMode {
-    fn default() -> Self {
-        Self::Enabled
-    }
 }
 
 impl std::fmt::Display for DataCollectionMode {

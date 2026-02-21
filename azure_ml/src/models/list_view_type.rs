@@ -11,20 +11,15 @@
 use serde::{Deserialize, Serialize};
 
 /// ListViewType : ListViewType enum
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum ListViewType {
     #[serde(rename = "ActiveOnly")]
+    #[default]
     ActiveOnly,
     #[serde(rename = "ArchivedOnly")]
     ArchivedOnly,
     #[serde(rename = "All")]
     All,
-}
-
-impl Default for ListViewType {
-    fn default() -> Self {
-        Self::ActiveOnly
-    }
 }
 
 impl std::fmt::Display for ListViewType {

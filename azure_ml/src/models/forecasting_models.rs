@@ -11,9 +11,10 @@
 use serde::{Deserialize, Serialize};
 
 /// ForecastingModels : Enum for all forecasting models supported by AutoML.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum ForecastingModels {
     #[serde(rename = "AutoArima")]
+    #[default]
     AutoArima,
     #[serde(rename = "Prophet")]
     Prophet,
@@ -51,12 +52,6 @@ pub enum ForecastingModels {
     LightGBM,
     #[serde(rename = "XGBoostRegressor")]
     XGBoostRegressor,
-}
-
-impl Default for ForecastingModels {
-    fn default() -> Self {
-        Self::AutoArima
-    }
 }
 
 impl std::fmt::Display for ForecastingModels {

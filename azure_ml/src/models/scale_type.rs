@@ -11,18 +11,13 @@
 use serde::{Deserialize, Serialize};
 
 /// ScaleType : ScaleType enum
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum ScaleType {
     #[serde(rename = "Default")]
+    #[default]
     Default,
     #[serde(rename = "TargetUtilization")]
     TargetUtilization,
-}
-
-impl Default for ScaleType {
-    fn default() -> Self {
-        Self::Default
-    }
 }
 
 impl std::fmt::Display for ScaleType {

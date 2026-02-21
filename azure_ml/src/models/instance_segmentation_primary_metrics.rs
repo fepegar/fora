@@ -11,16 +11,11 @@
 use serde::{Deserialize, Serialize};
 
 /// InstanceSegmentationPrimaryMetrics : Primary metrics for InstanceSegmentation tasks.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum InstanceSegmentationPrimaryMetrics {
     #[serde(rename = "MeanAveragePrecision")]
+    #[default]
     MeanAveragePrecision,
-}
-
-impl Default for InstanceSegmentationPrimaryMetrics {
-    fn default() -> Self {
-        Self::MeanAveragePrecision
-    }
 }
 
 impl std::fmt::Display for InstanceSegmentationPrimaryMetrics {

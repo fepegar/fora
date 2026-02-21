@@ -11,20 +11,15 @@
 use serde::{Deserialize, Serialize};
 
 /// MonitoringFeatureFilterType : MonitoringFeatureFilterType enum
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum MonitoringFeatureFilterType {
     #[serde(rename = "AllFeatures")]
+    #[default]
     AllFeatures,
     #[serde(rename = "TopNByAttribution")]
     TopNByAttribution,
     #[serde(rename = "FeatureSubset")]
     FeatureSubset,
-}
-
-impl Default for MonitoringFeatureFilterType {
-    fn default() -> Self {
-        Self::AllFeatures
-    }
 }
 
 impl std::fmt::Display for MonitoringFeatureFilterType {

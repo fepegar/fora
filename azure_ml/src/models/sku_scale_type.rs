@@ -11,20 +11,15 @@
 use serde::{Deserialize, Serialize};
 
 /// SkuScaleType : Node scaling setting for the compute sku.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum SkuScaleType {
     #[serde(rename = "Automatic")]
+    #[default]
     Automatic,
     #[serde(rename = "Manual")]
     Manual,
     #[serde(rename = "None")]
     None,
-}
-
-impl Default for SkuScaleType {
-    fn default() -> Self {
-        Self::Automatic
-    }
 }
 
 impl std::fmt::Display for SkuScaleType {

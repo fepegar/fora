@@ -11,20 +11,15 @@
 use serde::{Deserialize, Serialize};
 
 /// DataType : Enum to determine the type of data.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum DataType {
     #[serde(rename = "uri_file")]
+    #[default]
     UriFile,
     #[serde(rename = "uri_folder")]
     UriFolder,
     #[serde(rename = "mltable")]
     MlTable,
-}
-
-impl Default for DataType {
-    fn default() -> Self {
-        Self::UriFile
-    }
 }
 
 impl std::fmt::Display for DataType {

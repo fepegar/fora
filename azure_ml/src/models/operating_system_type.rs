@@ -11,18 +11,13 @@
 use serde::{Deserialize, Serialize};
 
 /// OperatingSystemType : The type of operating system.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum OperatingSystemType {
     #[serde(rename = "Linux")]
+    #[default]
     Linux,
     #[serde(rename = "Windows")]
     Windows,
-}
-
-impl Default for OperatingSystemType {
-    fn default() -> Self {
-        Self::Linux
-    }
 }
 
 impl std::fmt::Display for OperatingSystemType {

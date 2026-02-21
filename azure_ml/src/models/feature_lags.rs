@@ -11,18 +11,13 @@
 use serde::{Deserialize, Serialize};
 
 /// FeatureLags : Flag for generating lags for the numeric features.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum FeatureLags {
     #[serde(rename = "None")]
+    #[default]
     None,
     #[serde(rename = "Auto")]
     Auto,
-}
-
-impl Default for FeatureLags {
-    fn default() -> Self {
-        Self::None
-    }
 }
 
 impl std::fmt::Display for FeatureLags {

@@ -11,9 +11,10 @@
 use serde::{Deserialize, Serialize};
 
 /// ModelSize : Image model size.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum ModelSize {
     #[serde(rename = "None")]
+    #[default]
     None,
     #[serde(rename = "Small")]
     Small,
@@ -23,12 +24,6 @@ pub enum ModelSize {
     Large,
     #[serde(rename = "ExtraLarge")]
     ExtraLarge,
-}
-
-impl Default for ModelSize {
-    fn default() -> Self {
-        Self::None
-    }
 }
 
 impl std::fmt::Display for ModelSize {

@@ -11,16 +11,11 @@
 use serde::{Deserialize, Serialize};
 
 /// FeatureAttributionMetric : FeatureAttributionMetric enum
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum FeatureAttributionMetric {
     #[serde(rename = "NormalizedDiscountedCumulativeGain")]
+    #[default]
     NormalizedDiscountedCumulativeGain,
-}
-
-impl Default for FeatureAttributionMetric {
-    fn default() -> Self {
-        Self::NormalizedDiscountedCumulativeGain
-    }
 }
 
 impl std::fmt::Display for FeatureAttributionMetric {

@@ -11,9 +11,10 @@
 use serde::{Deserialize, Serialize};
 
 /// RegressionPrimaryMetrics : Primary metrics for Regression task.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum RegressionPrimaryMetrics {
     #[serde(rename = "SpearmanCorrelation")]
+    #[default]
     SpearmanCorrelation,
     #[serde(rename = "NormalizedRootMeanSquaredError")]
     NormalizedRootMeanSquaredError,
@@ -21,12 +22,6 @@ pub enum RegressionPrimaryMetrics {
     R2Score,
     #[serde(rename = "NormalizedMeanAbsoluteError")]
     NormalizedMeanAbsoluteError,
-}
-
-impl Default for RegressionPrimaryMetrics {
-    fn default() -> Self {
-        Self::SpearmanCorrelation
-    }
 }
 
 impl std::fmt::Display for RegressionPrimaryMetrics {

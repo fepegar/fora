@@ -11,18 +11,13 @@
 use serde::{Deserialize, Serialize};
 
 /// PublicNetworkAccessType : Enum to determine whether PublicNetworkAccess is Enabled or Disabled.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum PublicNetworkAccessType {
     #[serde(rename = "Enabled")]
+    #[default]
     Enabled,
     #[serde(rename = "Disabled")]
     Disabled,
-}
-
-impl Default for PublicNetworkAccessType {
-    fn default() -> Self {
-        Self::Enabled
-    }
 }
 
 impl std::fmt::Display for PublicNetworkAccessType {

@@ -11,20 +11,15 @@
 use serde::{Deserialize, Serialize};
 
 /// MarketplaceSubscriptionStatus : MarketplaceSubscriptionStatus enum
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum MarketplaceSubscriptionStatus {
     #[serde(rename = "Subscribed")]
+    #[default]
     Subscribed,
     #[serde(rename = "Suspended")]
     Suspended,
     #[serde(rename = "Unsubscribed")]
     Unsubscribed,
-}
-
-impl Default for MarketplaceSubscriptionStatus {
-    fn default() -> Self {
-        Self::Subscribed
-    }
 }
 
 impl std::fmt::Display for MarketplaceSubscriptionStatus {

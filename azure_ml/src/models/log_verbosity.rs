@@ -11,9 +11,10 @@
 use serde::{Deserialize, Serialize};
 
 /// LogVerbosity : Enum for setting log verbosity.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum LogVerbosity {
     #[serde(rename = "NotSet")]
+    #[default]
     NotSet,
     #[serde(rename = "Debug")]
     Debug,
@@ -25,12 +26,6 @@ pub enum LogVerbosity {
     Error,
     #[serde(rename = "Critical")]
     Critical,
-}
-
-impl Default for LogVerbosity {
-    fn default() -> Self {
-        Self::NotSet
-    }
 }
 
 impl std::fmt::Display for LogVerbosity {

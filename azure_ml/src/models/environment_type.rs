@@ -11,18 +11,13 @@
 use serde::{Deserialize, Serialize};
 
 /// EnvironmentType : Environment type is either user created or curated by Azure ML service
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum EnvironmentType {
     #[serde(rename = "Curated")]
+    #[default]
     Curated,
     #[serde(rename = "UserCreated")]
     UserCreated,
-}
-
-impl Default for EnvironmentType {
-    fn default() -> Self {
-        Self::Curated
-    }
 }
 
 impl std::fmt::Display for EnvironmentType {

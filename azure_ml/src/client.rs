@@ -28,7 +28,7 @@ pub struct MLClient {
     pub(crate) pipeline: Pipeline,
 }
 
-#[derive(Clone, SafeDebug)]
+#[derive(Clone, SafeDebug, Default)]
 pub struct MLClientOptions {
     /// ClientOptions for customizing the pipeline.
     pub client_options: ClientOptions,
@@ -137,13 +137,5 @@ impl MLClient {
                 })
             }
         }))
-    }
-}
-
-impl Default for MLClientOptions {
-    fn default() -> Self {
-        Self {
-            client_options: ClientOptions::default(),
-        }
     }
 }

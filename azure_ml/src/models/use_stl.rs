@@ -11,20 +11,15 @@
 use serde::{Deserialize, Serialize};
 
 /// UseStl : Configure STL Decomposition of the time-series target column.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum UseStl {
     #[serde(rename = "None")]
+    #[default]
     None,
     #[serde(rename = "Season")]
     Season,
     #[serde(rename = "SeasonTrend")]
     SeasonTrend,
-}
-
-impl Default for UseStl {
-    fn default() -> Self {
-        Self::None
-    }
 }
 
 impl std::fmt::Display for UseStl {

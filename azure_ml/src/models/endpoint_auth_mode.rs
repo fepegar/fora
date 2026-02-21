@@ -11,20 +11,15 @@
 use serde::{Deserialize, Serialize};
 
 /// EndpointAuthMode : Enum to determine endpoint authentication mode.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum EndpointAuthMode {
     #[serde(rename = "AMLToken")]
+    #[default]
     AMLToken,
     #[serde(rename = "Key")]
     Key,
     #[serde(rename = "AADToken")]
     AADToken,
-}
-
-impl Default for EndpointAuthMode {
-    fn default() -> Self {
-        Self::AMLToken
-    }
 }
 
 impl std::fmt::Display for EndpointAuthMode {

@@ -11,9 +11,10 @@
 use serde::{Deserialize, Serialize};
 
 /// ClassificationPrimaryMetrics : Primary metrics for classification tasks.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum ClassificationPrimaryMetrics {
     #[serde(rename = "AUCWeighted")]
+    #[default]
     AUCWeighted,
     #[serde(rename = "Accuracy")]
     Accuracy,
@@ -23,12 +24,6 @@ pub enum ClassificationPrimaryMetrics {
     AveragePrecisionScoreWeighted,
     #[serde(rename = "PrecisionScoreWeighted")]
     PrecisionScoreWeighted,
-}
-
-impl Default for ClassificationPrimaryMetrics {
-    fn default() -> Self {
-        Self::AUCWeighted
-    }
 }
 
 impl std::fmt::Display for ClassificationPrimaryMetrics {

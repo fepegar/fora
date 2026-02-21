@@ -11,18 +11,13 @@
 use serde::{Deserialize, Serialize};
 
 /// BatchDeploymentConfigurationType : The enumerated property types for batch deployments.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum BatchDeploymentConfigurationType {
     #[serde(rename = "Model")]
+    #[default]
     Model,
     #[serde(rename = "PipelineComponent")]
     PipelineComponent,
-}
-
-impl Default for BatchDeploymentConfigurationType {
-    fn default() -> Self {
-        Self::Model
-    }
 }
 
 impl std::fmt::Display for BatchDeploymentConfigurationType {

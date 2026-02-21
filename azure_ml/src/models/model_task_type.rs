@@ -11,18 +11,13 @@
 use serde::{Deserialize, Serialize};
 
 /// ModelTaskType : Model task type enum.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum ModelTaskType {
     #[serde(rename = "Classification")]
+    #[default]
     Classification,
     #[serde(rename = "Regression")]
     Regression,
-}
-
-impl Default for ModelTaskType {
-    fn default() -> Self {
-        Self::Classification
-    }
 }
 
 impl std::fmt::Display for ModelTaskType {

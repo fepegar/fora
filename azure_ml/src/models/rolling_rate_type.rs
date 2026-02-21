@@ -11,9 +11,10 @@
 use serde::{Deserialize, Serialize};
 
 /// RollingRateType : RollingRateType enum
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum RollingRateType {
     #[serde(rename = "Year")]
+    #[default]
     Year,
     #[serde(rename = "Month")]
     Month,
@@ -23,12 +24,6 @@ pub enum RollingRateType {
     Hour,
     #[serde(rename = "Minute")]
     Minute,
-}
-
-impl Default for RollingRateType {
-    fn default() -> Self {
-        Self::Year
-    }
 }
 
 impl std::fmt::Display for RollingRateType {

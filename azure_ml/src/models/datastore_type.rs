@@ -11,9 +11,10 @@
 use serde::{Deserialize, Serialize};
 
 /// DatastoreType : Enum to determine the datastore contents type.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum DatastoreType {
     #[serde(rename = "AzureBlob")]
+    #[default]
     AzureBlob,
     #[serde(rename = "AzureDataLakeGen1")]
     AzureDataLakeGen1,
@@ -23,12 +24,6 @@ pub enum DatastoreType {
     AzureFile,
     #[serde(rename = "OneLake")]
     OneLake,
-}
-
-impl Default for DatastoreType {
-    fn default() -> Self {
-        Self::AzureBlob
-    }
 }
 
 impl std::fmt::Display for DatastoreType {

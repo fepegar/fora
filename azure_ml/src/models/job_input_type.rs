@@ -11,9 +11,10 @@
 use serde::{Deserialize, Serialize};
 
 /// JobInputType : Enum to determine the Job Input Type.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum JobInputType {
     #[serde(rename = "literal")]
+    #[default]
     Literal,
     #[serde(rename = "uri_file")]
     UriFile,
@@ -27,12 +28,6 @@ pub enum JobInputType {
     MlFlowModel,
     #[serde(rename = "triton_model")]
     TritonModel,
-}
-
-impl Default for JobInputType {
-    fn default() -> Self {
-        Self::Literal
-    }
 }
 
 impl std::fmt::Display for JobInputType {

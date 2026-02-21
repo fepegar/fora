@@ -11,20 +11,15 @@
 use serde::{Deserialize, Serialize};
 
 /// ScheduleActionType : ScheduleActionType enum
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum ScheduleActionType {
     #[serde(rename = "CreateJob")]
+    #[default]
     CreateJob,
     #[serde(rename = "InvokeBatchEndpoint")]
     InvokeBatchEndpoint,
     #[serde(rename = "CreateMonitor")]
     CreateMonitor,
-}
-
-impl Default for ScheduleActionType {
-    fn default() -> Self {
-        Self::CreateJob
-    }
 }
 
 impl std::fmt::Display for ScheduleActionType {

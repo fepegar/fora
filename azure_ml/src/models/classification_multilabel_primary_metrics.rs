@@ -11,9 +11,10 @@
 use serde::{Deserialize, Serialize};
 
 /// ClassificationMultilabelPrimaryMetrics : Primary metrics for classification multilabel tasks.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum ClassificationMultilabelPrimaryMetrics {
     #[serde(rename = "AUCWeighted")]
+    #[default]
     AUCWeighted,
     #[serde(rename = "Accuracy")]
     Accuracy,
@@ -25,12 +26,6 @@ pub enum ClassificationMultilabelPrimaryMetrics {
     PrecisionScoreWeighted,
     #[serde(rename = "IOU")]
     IOU,
-}
-
-impl Default for ClassificationMultilabelPrimaryMetrics {
-    fn default() -> Self {
-        Self::AUCWeighted
-    }
 }
 
 impl std::fmt::Display for ClassificationMultilabelPrimaryMetrics {

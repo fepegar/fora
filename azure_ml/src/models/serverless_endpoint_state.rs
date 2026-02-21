@@ -11,9 +11,10 @@
 use serde::{Deserialize, Serialize};
 
 /// ServerlessEndpointState : State of the Serverless Endpoint.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum ServerlessEndpointState {
     #[serde(rename = "Unknown")]
+    #[default]
     Unknown,
     #[serde(rename = "Creating")]
     Creating,
@@ -31,12 +32,6 @@ pub enum ServerlessEndpointState {
     CreationFailed,
     #[serde(rename = "DeletionFailed")]
     DeletionFailed,
-}
-
-impl Default for ServerlessEndpointState {
-    fn default() -> Self {
-        Self::Unknown
-    }
 }
 
 impl std::fmt::Display for ServerlessEndpointState {

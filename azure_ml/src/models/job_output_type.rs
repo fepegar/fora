@@ -11,9 +11,10 @@
 use serde::{Deserialize, Serialize};
 
 /// JobOutputType : Enum to determine the Job Output Type.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum JobOutputType {
     #[serde(rename = "uri_file")]
+    #[default]
     UriFile,
     #[serde(rename = "uri_folder")]
     UriFolder,
@@ -25,12 +26,6 @@ pub enum JobOutputType {
     MlFlowModel,
     #[serde(rename = "triton_model")]
     TritonModel,
-}
-
-impl Default for JobOutputType {
-    fn default() -> Self {
-        Self::UriFile
-    }
 }
 
 impl std::fmt::Display for JobOutputType {

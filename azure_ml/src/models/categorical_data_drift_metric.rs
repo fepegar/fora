@@ -11,20 +11,15 @@
 use serde::{Deserialize, Serialize};
 
 /// CategoricalDataDriftMetric : CategoricalDataDriftMetric enum
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum CategoricalDataDriftMetric {
     #[serde(rename = "JensenShannonDistance")]
+    #[default]
     JensenShannonDistance,
     #[serde(rename = "PopulationStabilityIndex")]
     PopulationStabilityIndex,
     #[serde(rename = "PearsonsChiSquaredTest")]
     PearsonsChiSquaredTest,
-}
-
-impl Default for CategoricalDataDriftMetric {
-    fn default() -> Self {
-        Self::JensenShannonDistance
-    }
 }
 
 impl std::fmt::Display for CategoricalDataDriftMetric {

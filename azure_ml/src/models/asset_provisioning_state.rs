@@ -11,9 +11,10 @@
 use serde::{Deserialize, Serialize};
 
 /// AssetProvisioningState : Provisioning state of registry asset.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum AssetProvisioningState {
     #[serde(rename = "Succeeded")]
+    #[default]
     Succeeded,
     #[serde(rename = "Failed")]
     Failed,
@@ -25,12 +26,6 @@ pub enum AssetProvisioningState {
     Updating,
     #[serde(rename = "Deleting")]
     Deleting,
-}
-
-impl Default for AssetProvisioningState {
-    fn default() -> Self {
-        Self::Succeeded
-    }
 }
 
 impl std::fmt::Display for AssetProvisioningState {

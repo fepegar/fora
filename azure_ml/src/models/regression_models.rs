@@ -11,9 +11,10 @@
 use serde::{Deserialize, Serialize};
 
 /// RegressionModels : Enum for all Regression models supported by AutoML.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum RegressionModels {
     #[serde(rename = "ElasticNet")]
+    #[default]
     ElasticNet,
     #[serde(rename = "GradientBoosting")]
     GradientBoosting,
@@ -33,12 +34,6 @@ pub enum RegressionModels {
     LightGBM,
     #[serde(rename = "XGBoostRegressor")]
     XGBoostRegressor,
-}
-
-impl Default for RegressionModels {
-    fn default() -> Self {
-        Self::ElasticNet
-    }
 }
 
 impl std::fmt::Display for RegressionModels {

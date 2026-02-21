@@ -11,9 +11,10 @@
 use serde::{Deserialize, Serialize};
 
 /// OrderString : OrderString enum
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum OrderString {
     #[serde(rename = "CreatedAtDesc")]
+    #[default]
     CreatedAtDesc,
     #[serde(rename = "CreatedAtAsc")]
     CreatedAtAsc,
@@ -21,12 +22,6 @@ pub enum OrderString {
     UpdatedAtDesc,
     #[serde(rename = "UpdatedAtAsc")]
     UpdatedAtAsc,
-}
-
-impl Default for OrderString {
-    fn default() -> Self {
-        Self::CreatedAtDesc
-    }
 }
 
 impl std::fmt::Display for OrderString {

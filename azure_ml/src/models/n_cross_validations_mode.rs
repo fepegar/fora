@@ -11,18 +11,13 @@
 use serde::{Deserialize, Serialize};
 
 /// NCrossValidationsMode : Determines how N-Cross validations value is determined.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum NCrossValidationsMode {
     #[serde(rename = "Auto")]
+    #[default]
     Auto,
     #[serde(rename = "Custom")]
     Custom,
-}
-
-impl Default for NCrossValidationsMode {
-    fn default() -> Self {
-        Self::Auto
-    }
 }
 
 impl std::fmt::Display for NCrossValidationsMode {

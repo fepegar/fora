@@ -11,9 +11,10 @@
 use serde::{Deserialize, Serialize};
 
 /// TaskType : AutoMLJob Task type.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum TaskType {
     #[serde(rename = "Classification")]
+    #[default]
     Classification,
     #[serde(rename = "Regression")]
     Regression,
@@ -33,12 +34,6 @@ pub enum TaskType {
     TextClassificationMultilabel,
     #[serde(rename = "TextNER")]
     TextNER,
-}
-
-impl Default for TaskType {
-    fn default() -> Self {
-        Self::Classification
-    }
 }
 
 impl std::fmt::Display for TaskType {

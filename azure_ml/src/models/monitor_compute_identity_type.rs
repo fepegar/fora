@@ -11,18 +11,13 @@
 use serde::{Deserialize, Serialize};
 
 /// MonitorComputeIdentityType : Monitor compute identity type enum.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum MonitorComputeIdentityType {
     #[serde(rename = "AmlToken")]
+    #[default]
     AmlToken,
     #[serde(rename = "ManagedIdentity")]
     ManagedIdentity,
-}
-
-impl Default for MonitorComputeIdentityType {
-    fn default() -> Self {
-        Self::AmlToken
-    }
 }
 
 impl std::fmt::Display for MonitorComputeIdentityType {

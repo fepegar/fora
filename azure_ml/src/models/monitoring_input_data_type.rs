@@ -11,20 +11,15 @@
 use serde::{Deserialize, Serialize};
 
 /// MonitoringInputDataType : Monitoring input data type enum.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum MonitoringInputDataType {
     #[serde(rename = "Static")]
+    #[default]
     Static,
     #[serde(rename = "Rolling")]
     Rolling,
     #[serde(rename = "Fixed")]
     Fixed,
-}
-
-impl Default for MonitoringInputDataType {
-    fn default() -> Self {
-        Self::Static
-    }
 }
 
 impl std::fmt::Display for MonitoringInputDataType {

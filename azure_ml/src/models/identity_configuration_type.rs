@@ -11,20 +11,15 @@
 use serde::{Deserialize, Serialize};
 
 /// IdentityConfigurationType : Enum to determine identity framework.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum IdentityConfigurationType {
     #[serde(rename = "Managed")]
+    #[default]
     Managed,
     #[serde(rename = "AMLToken")]
     AMLToken,
     #[serde(rename = "UserIdentity")]
     UserIdentity,
-}
-
-impl Default for IdentityConfigurationType {
-    fn default() -> Self {
-        Self::Managed
-    }
 }
 
 impl std::fmt::Display for IdentityConfigurationType {

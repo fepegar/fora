@@ -11,9 +11,10 @@
 use serde::{Deserialize, Serialize};
 
 /// ForecastingPrimaryMetrics : Primary metrics for Forecasting task.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum ForecastingPrimaryMetrics {
     #[serde(rename = "SpearmanCorrelation")]
+    #[default]
     SpearmanCorrelation,
     #[serde(rename = "NormalizedRootMeanSquaredError")]
     NormalizedRootMeanSquaredError,
@@ -21,12 +22,6 @@ pub enum ForecastingPrimaryMetrics {
     R2Score,
     #[serde(rename = "NormalizedMeanAbsoluteError")]
     NormalizedMeanAbsoluteError,
-}
-
-impl Default for ForecastingPrimaryMetrics {
-    fn default() -> Self {
-        Self::SpearmanCorrelation
-    }
 }
 
 impl std::fmt::Display for ForecastingPrimaryMetrics {

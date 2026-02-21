@@ -11,9 +11,10 @@
 use serde::{Deserialize, Serialize};
 
 /// ValidationMetricType : Metric computation method to use for validation metrics in image tasks.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum ValidationMetricType {
     #[serde(rename = "None")]
+    #[default]
     None,
     #[serde(rename = "Coco")]
     Coco,
@@ -21,12 +22,6 @@ pub enum ValidationMetricType {
     Voc,
     #[serde(rename = "CocoVoc")]
     CocoVoc,
-}
-
-impl Default for ValidationMetricType {
-    fn default() -> Self {
-        Self::None
-    }
 }
 
 impl std::fmt::Display for ValidationMetricType {

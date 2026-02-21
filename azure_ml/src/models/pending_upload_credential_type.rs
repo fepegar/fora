@@ -11,16 +11,11 @@
 use serde::{Deserialize, Serialize};
 
 /// PendingUploadCredentialType : Enum to determine the PendingUpload credentials type.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum PendingUploadCredentialType {
     #[serde(rename = "SAS")]
+    #[default]
     SAS,
-}
-
-impl Default for PendingUploadCredentialType {
-    fn default() -> Self {
-        Self::SAS
-    }
 }
 
 impl std::fmt::Display for PendingUploadCredentialType {

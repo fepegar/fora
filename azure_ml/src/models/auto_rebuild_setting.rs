@@ -11,18 +11,13 @@
 use serde::{Deserialize, Serialize};
 
 /// AutoRebuildSetting : AutoRebuild setting for the derived image
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum AutoRebuildSetting {
     #[serde(rename = "Disabled")]
+    #[default]
     Disabled,
     #[serde(rename = "OnBaseImageUpdate")]
     OnBaseImageUpdate,
-}
-
-impl Default for AutoRebuildSetting {
-    fn default() -> Self {
-        Self::Disabled
-    }
 }
 
 impl std::fmt::Display for AutoRebuildSetting {

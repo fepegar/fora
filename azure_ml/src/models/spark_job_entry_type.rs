@@ -11,18 +11,13 @@
 use serde::{Deserialize, Serialize};
 
 /// SparkJobEntryType : SparkJobEntryType enum
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum SparkJobEntryType {
     #[serde(rename = "SparkJobPythonEntry")]
+    #[default]
     SparkJobPythonEntry,
     #[serde(rename = "SparkJobScalaEntry")]
     SparkJobScalaEntry,
-}
-
-impl Default for SparkJobEntryType {
-    fn default() -> Self {
-        Self::SparkJobPythonEntry
-    }
 }
 
 impl std::fmt::Display for SparkJobEntryType {

@@ -11,18 +11,13 @@
 use serde::{Deserialize, Serialize};
 
 /// KeyType : KeyType enum
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum KeyType {
     #[serde(rename = "Primary")]
+    #[default]
     Primary,
     #[serde(rename = "Secondary")]
     Secondary,
-}
-
-impl Default for KeyType {
-    fn default() -> Self {
-        Self::Primary
-    }
 }
 
 impl std::fmt::Display for KeyType {

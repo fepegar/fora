@@ -11,18 +11,13 @@
 use serde::{Deserialize, Serialize};
 
 /// ContentSafetyStatus : Specifies the status of content safety.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum ContentSafetyStatus {
     #[serde(rename = "Enabled")]
+    #[default]
     Enabled,
     #[serde(rename = "Disabled")]
     Disabled,
-}
-
-impl Default for ContentSafetyStatus {
-    fn default() -> Self {
-        Self::Enabled
-    }
 }
 
 impl std::fmt::Display for ContentSafetyStatus {

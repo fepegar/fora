@@ -11,9 +11,10 @@
 use serde::{Deserialize, Serialize};
 
 /// CredentialsType : Enum to determine the datastore credentials type.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum CredentialsType {
     #[serde(rename = "AccountKey")]
+    #[default]
     AccountKey,
     #[serde(rename = "Certificate")]
     Certificate,
@@ -23,12 +24,6 @@ pub enum CredentialsType {
     Sas,
     #[serde(rename = "ServicePrincipal")]
     ServicePrincipal,
-}
-
-impl Default for CredentialsType {
-    fn default() -> Self {
-        Self::AccountKey
-    }
 }
 
 impl std::fmt::Display for CredentialsType {

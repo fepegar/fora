@@ -12,9 +12,10 @@ use serde::{Deserialize, Serialize};
 
 /// SkuTier : This field is required to be implemented by the Resource Provider if the service has more than one tier, but is not required on a PUT.
 /// This field is required to be implemented by the Resource Provider if the service has more than one tier, but is not required on a PUT.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Default)]
 pub enum SkuTier {
     #[serde(rename = "Free")]
+    #[default]
     Free,
     #[serde(rename = "Basic")]
     Basic,
@@ -32,11 +33,5 @@ impl std::fmt::Display for SkuTier {
             Self::Standard => write!(f, "Standard"),
             Self::Premium => write!(f, "Premium"),
         }
-    }
-}
-
-impl Default for SkuTier {
-    fn default() -> SkuTier {
-        Self::Free
     }
 }

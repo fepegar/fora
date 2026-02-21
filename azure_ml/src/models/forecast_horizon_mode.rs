@@ -11,18 +11,13 @@
 use serde::{Deserialize, Serialize};
 
 /// ForecastHorizonMode : Enum to determine forecast horizon selection mode.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum ForecastHorizonMode {
     #[serde(rename = "Auto")]
+    #[default]
     Auto,
     #[serde(rename = "Custom")]
     Custom,
-}
-
-impl Default for ForecastHorizonMode {
-    fn default() -> Self {
-        Self::Auto
-    }
 }
 
 impl std::fmt::Display for ForecastHorizonMode {

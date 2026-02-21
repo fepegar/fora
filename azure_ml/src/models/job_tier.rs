@@ -11,9 +11,10 @@
 use serde::{Deserialize, Serialize};
 
 /// JobTier : Enum to determine the job tier.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum JobTier {
     #[serde(rename = "Null")]
+    #[default]
     Null,
     #[serde(rename = "Spot")]
     Spot,
@@ -23,12 +24,6 @@ pub enum JobTier {
     Standard,
     #[serde(rename = "Premium")]
     Premium,
-}
-
-impl Default for JobTier {
-    fn default() -> Self {
-        Self::Null
-    }
 }
 
 impl std::fmt::Display for JobTier {

@@ -11,16 +11,11 @@
 use serde::{Deserialize, Serialize};
 
 /// MonitorComputeType : Monitor compute type enum.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum MonitorComputeType {
     #[serde(rename = "ServerlessSpark")]
+    #[default]
     ServerlessSpark,
-}
-
-impl Default for MonitorComputeType {
-    fn default() -> Self {
-        Self::ServerlessSpark
-    }
 }
 
 impl std::fmt::Display for MonitorComputeType {

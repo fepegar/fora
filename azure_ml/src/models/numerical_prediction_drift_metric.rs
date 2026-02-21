@@ -11,9 +11,10 @@
 use serde::{Deserialize, Serialize};
 
 /// NumericalPredictionDriftMetric : NumericalPredictionDriftMetric enum
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum NumericalPredictionDriftMetric {
     #[serde(rename = "JensenShannonDistance")]
+    #[default]
     JensenShannonDistance,
     #[serde(rename = "PopulationStabilityIndex")]
     PopulationStabilityIndex,
@@ -21,12 +22,6 @@ pub enum NumericalPredictionDriftMetric {
     NormalizedWassersteinDistance,
     #[serde(rename = "TwoSampleKolmogorovSmirnovTest")]
     TwoSampleKolmogorovSmirnovTest,
-}
-
-impl Default for NumericalPredictionDriftMetric {
-    fn default() -> Self {
-        Self::JensenShannonDistance
-    }
 }
 
 impl std::fmt::Display for NumericalPredictionDriftMetric {

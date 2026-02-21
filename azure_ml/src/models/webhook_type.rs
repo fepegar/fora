@@ -11,16 +11,11 @@
 use serde::{Deserialize, Serialize};
 
 /// WebhookType : Enum to determine the webhook callback service type.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum WebhookType {
     #[serde(rename = "AzureDevOps")]
+    #[default]
     AzureDevOps,
-}
-
-impl Default for WebhookType {
-    fn default() -> Self {
-        Self::AzureDevOps
-    }
 }
 
 impl std::fmt::Display for WebhookType {
