@@ -54,4 +54,3 @@ pub struct ServerlessEndpointsUpdateOptions<'a> {
     /// Allows customization of the method call.
     pub method_options: ClientMethodOptions<'a>,
 }
-

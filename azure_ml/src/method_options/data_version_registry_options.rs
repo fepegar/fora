@@ -50,4 +50,3 @@ impl RegistryDataVersionsListOptions<'_> {
         }
     }
 }
-

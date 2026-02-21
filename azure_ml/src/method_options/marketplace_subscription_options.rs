@@ -36,4 +36,3 @@ impl MarketplaceSubscriptionsListOptions<'_> {
         }
     }
 }
-

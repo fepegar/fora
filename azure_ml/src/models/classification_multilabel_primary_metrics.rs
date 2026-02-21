@@ -57,7 +57,10 @@ impl std::str::FromStr for ClassificationMultilabelPrimaryMetrics {
             "AveragePrecisionScoreWeighted" => Ok(Self::AveragePrecisionScoreWeighted),
             "PrecisionScoreWeighted" => Ok(Self::PrecisionScoreWeighted),
             "IOU" => Ok(Self::IOU),
-            _ => Err(format!("Invalid ClassificationMultilabelPrimaryMetrics: {}", s)),
+            _ => Err(format!(
+                "Invalid ClassificationMultilabelPrimaryMetrics: {}",
+                s
+            )),
         }
     }
 }

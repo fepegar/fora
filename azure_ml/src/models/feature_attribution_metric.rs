@@ -26,7 +26,9 @@ impl Default for FeatureAttributionMetric {
 impl std::fmt::Display for FeatureAttributionMetric {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Self::NormalizedDiscountedCumulativeGain => write!(f, "NormalizedDiscountedCumulativeGain"),
+            Self::NormalizedDiscountedCumulativeGain => {
+                write!(f, "NormalizedDiscountedCumulativeGain")
+            }
         }
     }
 }

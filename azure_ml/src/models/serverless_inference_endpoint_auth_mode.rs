@@ -37,7 +37,10 @@ impl std::str::FromStr for ServerlessInferenceEndpointAuthMode {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "Key" => Ok(Self::Key),
-            _ => Err(format!("Invalid ServerlessInferenceEndpointAuthMode: {}", s)),
+            _ => Err(format!(
+                "Invalid ServerlessInferenceEndpointAuthMode: {}",
+                s
+            )),
         }
     }
 }

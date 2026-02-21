@@ -79,4 +79,3 @@ impl RegistryModelContainersListOptions<'_> {
         }
     }
 }
-

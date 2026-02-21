@@ -38,4 +38,3 @@ impl SchedulesListOptions<'_> {
         }
     }
 }
-

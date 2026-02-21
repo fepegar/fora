@@ -57,7 +57,10 @@ impl std::str::FromStr for MarketplaceSubscriptionProvisioningState {
             "Failed" => Ok(Self::Failed),
             "Updating" => Ok(Self::Updating),
             "Canceled" => Ok(Self::Canceled),
-            _ => Err(format!("Invalid MarketplaceSubscriptionProvisioningState: {}", s)),
+            _ => Err(format!(
+                "Invalid MarketplaceSubscriptionProvisioningState: {}",
+                s
+            )),
         }
     }
 }
