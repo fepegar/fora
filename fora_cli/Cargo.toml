@@ -1,0 +1,14 @@
+[package]
+name = "fora_cli"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.83"
+
+[dependencies]
+azure_ml = { path = "../azure_ml" }
+azure_core = { workspace = true }
+azure_identity = { workspace = true }
+tokio = { workspace = true }
+futures = { workspace = true }
+clap = { version = "4.4", features = ["derive"] }
+anyhow = "1.0"

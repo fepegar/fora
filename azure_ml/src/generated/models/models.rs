@@ -6335,7 +6335,7 @@ pub struct JobBase {
 
     /// [Required] Additional attributes of the entity.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub properties: Option<JobBaseProperties>,
+    pub properties: Option<JobBaseProperties>, // Option<Value>,
 
     /// Azure Resource Manager metadata containing createdBy and modifiedBy information.
     #[serde(rename = "systemData", skip_serializing_if = "Option::is_none")]
