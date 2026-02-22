@@ -19,7 +19,6 @@ crossterm = { workspace = true }
 # Azure SDK dependencies
 azure_core = { workspace = true }
 azure_identity = { workspace = true }
-azure_mgmt_machinelearningservices = { workspace = true }
 
 # Serialization
 serde = { workspace = true }

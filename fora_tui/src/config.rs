@@ -32,8 +32,6 @@ pub struct CacheConfig {
     pub ttl_seconds: u64,
 }
 
-
-
 impl Default for CacheConfig {
     fn default() -> Self {
         Self {

@@ -2,33 +2,12 @@
 name = "azure_ml"
 version = "0.1.0"
 edition = "2021"
-description = "Azure ML REST API client and models"
+rust-version = "1.83"
+
+[features]
+default = ["azure_core/default"]
 
 [dependencies]
-# Azure SDK dependencies
-azure_core = { workspace = true }
-azure_identity = { workspace = true }
-azure_mgmt_machinelearningservices = { workspace = true }
-
-# Serialization
-serde = { workspace = true }
-serde_json = { workspace = true }
-
-# HTTP client
-reqwest = { workspace = true }
-
-# Utilities
-chrono = { workspace = true }
-uuid = { workspace = true }
-thiserror = { workspace = true }
-tracing = { workspace = true }
-async-trait = { workspace = true }
-futures = { workspace = true }
-url = { workspace = true }
-serde_with = { workspace = true }
-
-# Async runtime
-tokio = { workspace = true }
-
-[dev-dependencies]
-tracing-subscriber = { workspace = true }
+async-trait = "0.1"
+azure_core = "0.32"
+serde = { version = "1.0", features = ["derive"] }

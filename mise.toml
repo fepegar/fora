@@ -1,6 +1,4 @@
 [tools]
-"cargo:cargo-progenitor" = "latest"
-"npm:swagger-cli" = "latest"
 rust = { version = "latest", components = "rustfmt,clippy" }
 
 [tasks.format]
