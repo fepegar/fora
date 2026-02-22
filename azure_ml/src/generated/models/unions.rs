@@ -90,7 +90,7 @@ Base class for AutoML verticals - TableVertical/ImageVertical/NLPVertical"#]
 pub enum AutoMlVertical {
     Classification(Classification),
 
-    Forecasting(Forecasting),
+    Forecasting(Box<Forecasting>),
 
     ImageClassification(ImageClassification),
 
@@ -148,7 +148,7 @@ pub enum Compute {
 
     AmlCompute(AmlCompute),
 
-    ComputeInstance(ComputeInstance),
+    ComputeInstance(Box<ComputeInstance>),
 
     DataFactory(DataFactory),
 
@@ -492,7 +492,7 @@ pub enum IdentityConfiguration {
 #[serde(tag = "jobType")]
 pub enum JobBaseProperties {
     #[serde(rename = "AutoML")]
-    AutoMLJob(AutoMLJob),
+    AutoMLJob(Box<AutoMLJob>),
 
     #[serde(rename = "Command")]
     CommandJob(CommandJob),
@@ -973,13 +973,13 @@ pub enum SamplingAlgorithm {
 #[serde(tag = "actionType")]
 pub enum ScheduleActionBase {
     #[serde(rename = "CreateMonitor")]
-    CreateMonitorAction(CreateMonitorAction),
+    CreateMonitorAction(Box<CreateMonitorAction>),
 
     #[serde(rename = "InvokeBatchEndpoint")]
     EndpointScheduleAction(EndpointScheduleAction),
 
     #[serde(rename = "CreateJob")]
-    JobScheduleAction(JobScheduleAction),
+    JobScheduleAction(Box<JobScheduleAction>),
 
     #[serde(untagged)]
     UnknownActionType {

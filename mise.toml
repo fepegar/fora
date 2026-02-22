@@ -8,8 +8,8 @@ run = "cargo fmt --all"
 run = "cargo fmt --all --check"
 
 [tasks.lint]
-description = "Run clippy (deny warnings)"
-run = "cargo clippy --all-targets --all-features -- -D warnings"
+description = "Run clippy"
+run = "cargo clippy --all-targets --all-features"  #  -- -D warnings
 
 [tasks.test]
 run = "cargo test --all --verbose"

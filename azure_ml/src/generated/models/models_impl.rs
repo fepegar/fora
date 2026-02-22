@@ -642,7 +642,7 @@ impl From<AutoForecastHorizon> for ForecastHorizon {
 
 impl From<AutoMLJob> for JobBaseProperties {
     fn from(value: AutoMLJob) -> Self {
-        Self::AutoMLJob(value)
+        Self::AutoMLJob(Box::new(value))
     }
 }
 
@@ -768,13 +768,13 @@ impl From<CommandJobLimits> for JobLimits {
 
 impl From<ComputeInstance> for Compute {
     fn from(value: ComputeInstance) -> Self {
-        Self::ComputeInstance(value)
+        Self::ComputeInstance(Box::new(value))
     }
 }
 
 impl From<CreateMonitorAction> for ScheduleActionBase {
     fn from(value: CreateMonitorAction) -> Self {
-        Self::CreateMonitorAction(value)
+        Self::CreateMonitorAction(Box::new(value))
     }
 }
 
@@ -918,7 +918,7 @@ impl From<FixedInputData> for MonitoringInputDataBase {
 
 impl From<Forecasting> for AutoMlVertical {
     fn from(value: Forecasting) -> Self {
-        Self::Forecasting(value)
+        Self::Forecasting(Box::new(value))
     }
 }
 
@@ -972,7 +972,7 @@ impl From<ImageObjectDetection> for AutoMlVertical {
 
 impl From<JobScheduleAction> for ScheduleActionBase {
     fn from(value: JobScheduleAction) -> Self {
-        Self::JobScheduleAction(value)
+        Self::JobScheduleAction(Box::new(value))
     }
 }
 
