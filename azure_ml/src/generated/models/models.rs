@@ -825,7 +825,7 @@ pub struct AutoMLJob {
 
     /// The asset property dictionary.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub properties: Option<HashMap<String, String>>,
+    pub properties: Option<HashMap<String, Option<String>>>,
 
     /// Queue settings for the job
     #[serde(rename = "queueSettings", skip_serializing_if = "Option::is_none")]
@@ -2055,7 +2055,7 @@ pub struct CommandJob {
 
     /// The asset property dictionary.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub properties: Option<HashMap<String, String>>,
+    pub properties: Option<HashMap<String, Option<String>>>,
 
     /// Queue settings for the job
     #[serde(rename = "queueSettings", skip_serializing_if = "Option::is_none")]
@@ -11834,7 +11834,7 @@ pub struct PipelineJob {
 
     /// The asset property dictionary.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub properties: Option<HashMap<String, String>>,
+    pub properties: Option<HashMap<String, Option<String>>>,
 
     /// List of JobEndpoints.
     /// For local jobs, a job endpoint will have an endpoint value of FileStreamObject.
@@ -13486,7 +13486,7 @@ pub struct SparkJob {
 
     /// The asset property dictionary.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub properties: Option<HashMap<String, String>>,
+    pub properties: Option<HashMap<String, Option<String>>>,
 
     /// Python files used in the job.
     #[serde(rename = "pyFiles", skip_serializing_if = "Option::is_none")]
@@ -13721,7 +13721,7 @@ pub struct SweepJob {
 
     /// The asset property dictionary.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub properties: Option<HashMap<String, String>>,
+    pub properties: Option<HashMap<String, Option<String>>>,
 
     /// Queue settings for the job
     #[serde(rename = "queueSettings", skip_serializing_if = "Option::is_none")]

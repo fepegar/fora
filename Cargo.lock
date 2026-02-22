@@ -536,6 +536,7 @@ dependencies = [
  "azure_ml",
  "clap",
  "futures",
+ "serde_json",
  "tokio",
 ]
 
