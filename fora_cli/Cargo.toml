@@ -2,7 +2,11 @@
 name = "fora_cli"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.83"
+rust-version = "1.88"
+
+[[bin]]
+name = "fora"
+path = "src/main.rs"
 
 [dependencies]
 azure_ml = { path = "../azure_ml" }
@@ -10,6 +14,16 @@ azure_core = { workspace = true }
 azure_identity = { workspace = true }
 tokio = { workspace = true }
 futures = { workspace = true }
-clap = { version = "4.4", features = ["derive"] }
+clap = { version = "4.4", features = ["derive", "color"] }
 anyhow = "1.0"
 serde_json = "1.0"
+regex = "1.12.3"
+thiserror.workspace = true
+anstyle = "1.0.13"
+azure_storage_blob = "0.9.0"
+ignore = "0.4.25"
+url.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+sled = "0.34.7"
+uuid.workspace = true

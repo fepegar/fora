@@ -5,7 +5,7 @@ edition = "2021"
 description = "Terminal UI for Azure ML management"
 
 [[bin]]
-name = "fora"
+name = "fora_tui"
 path = "src/main.rs"
 
 [dependencies]

@@ -6,6 +6,8 @@ pub trait Environment: Sync {
 
     fn get_env_version(&self) -> Result<String>;
 
+    // TODO Do these need to be inside the trait?
+    // Feels like they could be external functions that take an `impl Environment`
     async fn create_environment(
         &self,
         ml_client,
