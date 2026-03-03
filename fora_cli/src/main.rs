@@ -1,12 +1,14 @@
 use anyhow::Result;
-use clap::{ColorChoice, CommandFactory, FromArgMatches, Parser};
-use tracing_subscriber::{fmt, EnvFilter};
+use clap::{CommandFactory, Parser};
+use tracing_subscriber::EnvFilter;
 
 mod cli;
 mod code;
+mod env;
 mod inputs;
 mod settings;
 mod submit;
+mod utils;
 use cli::{Cli, Command};
 use submit::submit_to_azure;
 

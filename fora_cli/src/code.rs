@@ -1,14 +1,13 @@
 use anyhow::Result;
 use azure_core::http::RequestContent;
 use azure_ml::models::BlobReferenceForConsumptionDto;
-use azure_ml::models::DatastoreProperties;
-use azure_ml::models::MachineLearningServicesDatastoresClientListOptions;
+use azure_ml::models::CodeVersion;
+use azure_ml::models::CodeVersionProperties;
 use azure_ml::models::PendingUploadCredentialDto;
 use azure_ml::models::PendingUploadRequestDto;
 use azure_ml::MachineLearningServicesClient;
 use azure_storage_blob::*;
 use futures::future::join_all;
-use futures::TryStreamExt as _;
 use ignore::WalkBuilder;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -25,7 +24,7 @@ pub async fn upload_folder_to_generated_location(
     resource_group: &str,
     workspace: &str,
     source_folder: &Path,
-) -> Result<()> {
+) -> Result<CodeVersion> {
     let container_name = uuid::Uuid::new_v4().to_string();
     debug!("Using container '{}' for code upload", container_name);
     let code_client = ml_client.get_machine_learning_services_code_versions_client();
@@ -56,9 +55,41 @@ pub async fn upload_folder_to_generated_location(
     debug!("Uploading code...");
     upload_folder_to_pending_upload_location(&source_folder, &blob_reference).await?;
 
-    // TODO: Create code version
+    // TODO: Do unwrapping more safely
+    let code_version_properties = CodeVersionProperties {
+        code_uri: Some(blob_reference.blob_uri.unwrap()),
+        is_anonymous: Some(true),
+        ..Default::default()
+    };
+    let code_version_request = CodeVersion {
+        properties: Some(code_version_properties),
+        ..Default::default()
+    };
+    let code_version_request_content: RequestContent<CodeVersion> =
+        code_version_request.try_into()?;
 
-    Ok(())
+    debug!("Creating code version from uploaded code...");
+    let code_version = code_client
+        .create_or_update(
+            &resource_group,
+            &workspace,
+            &container_name,
+            "1", // Must be a positive integer as a string
+            code_version_request_content,
+            None,
+        )
+        .await?
+        .into_model()?;
+
+    let code_version_id = code_version
+        .id
+        .as_ref()
+        .map(|id| id.as_str())
+        .unwrap_or("No ID");
+
+    debug!("Code version created with ID: {}", code_version_id);
+
+    Ok(code_version)
 }
 
 pub async fn upload_folder_to_pending_upload_location(
@@ -222,45 +253,4 @@ fn collect_files(folder: &Path) -> Vec<PathBuf> {
             }
         })
         .collect()
-}
-
-// TODO: We should have a cache in the ~/.fora directory
-// So we don't have to call this every time. Unless it's very fast.
-async fn get_default_container(
-    ml_client: &MachineLearningServicesClient,
-    resource_group: &str,
-    workspace: &str,
-) -> Result<String> {
-    let datastores_client = ml_client.get_machine_learning_services_datastores_client();
-
-    let options = MachineLearningServicesDatastoresClientListOptions {
-        is_default: Some(true),
-        ..Default::default()
-    };
-
-    let mut datastores_pager = datastores_client.list(resource_group, workspace, Some(options))?;
-    // Loop over until we find one with `is_default` set to true. There should only be one, but we'll just take the first one we find.
-    // If we don't find any, we'll return an error.
-    while let Some(datastore) = datastores_pager.try_next().await? {
-        let datastore_properties = datastore
-            .properties
-            .expect("Default datastore should have properties")
-            .clone();
-
-        match datastore_properties {
-            DatastoreProperties::AzureBlobDatastore(d) => {
-                let is_default = d.is_default.unwrap_or(false);
-                if is_default {
-                    let container_name = d
-                        .container_name
-                        .expect("Default blob datastore should have a container name");
-                    return Ok(container_name);
-                } else {
-                    continue; // Not the default datastore, keep looking
-                }
-            }
-            _ => return Err(anyhow::anyhow!("Default datastore is not a blob datastore")),
-        };
-    }
-    Err(anyhow::anyhow!("No default datastore found in workspace"))
 }

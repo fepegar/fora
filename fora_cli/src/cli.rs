@@ -6,6 +6,7 @@ use crate::inputs::InputEnum;
 use crate::settings::EnvironmentVariable;
 
 pub const HEADING_UV: &str = "UV Options";
+pub const HEADING_ENVIRONMENT: &str = "Environment Options";
 
 #[derive(Parser, Debug)]
 #[command(name = "fora", styles = get_styles())]
@@ -52,7 +53,7 @@ pub struct SubmitArgs {
         num_args = 0..,
         help = "Environment variable in the format of `NAME=VALUE`. Can be repeated for multiple environment variables"
     )]
-    pub env: Vec<EnvironmentVariable>,
+    pub set: Vec<EnvironmentVariable>,
 
     #[arg(
         long,
@@ -63,20 +64,61 @@ pub struct SubmitArgs {
     pub mount: Vec<InputEnum>,
 
     #[command(flatten)]
+    pub env_args: BaseEnvironmentArgs,
+
+    #[command(flatten)]
     pub uv_args: UvArgs,
+}
+
+#[derive(clap::ValueEnum, Clone, Debug, Default)]
+pub enum EnvironmentType {
+    // #[default]
+    // Auto,
+    Docker,
+    #[default]
+    Uv,
+}
+
+#[derive(Args, Debug)]
+#[command(next_help_heading = HEADING_ENVIRONMENT)]
+pub struct BaseEnvironmentArgs {
+    #[arg(
+        long,
+        value_enum,
+        default_value_t,
+        help = "Type of environment to use for the job."
+    )]
+    pub env_type: EnvironmentType,
+
+    #[arg(long, help = "Base Docker image to use for the environment.")]
+    pub base_docker_image: Option<String>,
+
+    // TODO: Change to Option<bool> when config files are set up
+    #[arg(
+        long,
+        default_value_t = true,
+        help = "Whether to automatically rebuild on base image changes."
+    )]
+    pub auto_rebuild: bool,
 }
 
 #[derive(Args, Debug)]
 #[command(next_help_heading = HEADING_UV)]
 pub struct UvArgs {
-    #[arg(long)]
-    pub pyproject_path: Option<String>,
+    #[arg(
+        long,
+        help = "Path to the project directory. If not set, defaults to the source directory."
+    )]
+    pub project_dir: Option<PathBuf>,
 
-    #[arg(long)]
-    pub base_docker_image: Option<String>,
-
+    // #[arg(long, default_value_t = false)]
+    // pub dont_prebuild_environment: bool,
+    //
     #[arg(long)]
     pub uv_extra: Vec<String>,
+
+    #[arg(long)]
+    pub uv_group: Vec<String>,
 }
 
 pub fn get_styles() -> clap::builder::Styles {

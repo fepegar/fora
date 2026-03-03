@@ -25,8 +25,9 @@ pub async fn submit_to_azure(args: &SubmitArgs) -> Result<()> {
     let current_dir = std::env::current_dir()?;
     let source_folder = args.source.as_ref().unwrap_or(&current_dir);
 
-    upload_folder_to_generated_location(&ml_client, resource_group, workspace, source_folder)
-        .await?;
+    let code_version =
+        upload_folder_to_generated_location(&ml_client, resource_group, workspace, source_folder)
+            .await?;
 
     Ok(())
 }

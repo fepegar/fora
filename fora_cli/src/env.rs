@@ -1,0 +1,285 @@
+use anyhow::Result;
+use async_trait::async_trait;
+use azure_ml::clients::MachineLearningServicesEnvironmentVersionsClient;
+use azure_ml::models::AutoRebuildSetting;
+use azure_ml::models::BuildContext;
+use azure_ml::models::EnvironmentVersion;
+use azure_ml::models::EnvironmentVersionProperties;
+use azure_ml::MachineLearningServicesClient;
+use blake3::Hasher;
+use std::path::PathBuf;
+use std::sync::Arc;
+use tokio::fs;
+use tracing::debug;
+use url::Url;
+
+use crate::utils::get_default_container;
+
+// TODO Do these need to be inside the trait?
+// Feels like they could be external functions that take an `impl Environment`
+async fn create_environment<E: Environment + ?Sized>(
+    env: &E,
+    ml_client: &MachineLearningServicesClient,
+    env_client: &MachineLearningServicesEnvironmentVersionsClient,
+    resource_group: &str,
+    workspace: &str,
+    env_name: &str,
+    version: &str,
+) -> Result<EnvironmentVersion> {
+    let environment_version_body = env
+        .get_envirnoment_version_body(ml_client, resource_group, workspace, env_name)
+        .await?;
+
+    let environment_version = env_client
+        .create_or_update(
+            resource_group,
+            workspace,
+            env_name,
+            version,
+            environment_version_body.try_into()?,
+            None,
+        )
+        .await?
+        .into_model()?;
+
+    Ok(environment_version)
+}
+
+// Same for this function
+async fn get_environment(
+    env_client: &MachineLearningServicesEnvironmentVersionsClient,
+    resource_group: &str,
+    workspace: &str,
+    env_name: &str,
+    version: &str,
+) -> Result<EnvironmentVersion> {
+    let environment_version = env_client
+        .get(&resource_group, &workspace, &env_name, &version, None)
+        .await?
+        .into_model()?;
+
+    Ok(environment_version)
+}
+
+#[async_trait]
+pub trait Environment: Sync {
+    async fn get_env_name(&self) -> Result<String>;
+
+    fn get_env_version(&self) -> Result<String>;
+
+    async fn get_envirnoment_version_body(
+        &self,
+        env_client: &MachineLearningServicesClient,
+        resource_group: &str,
+        workspace: &str,
+        env_name: &str,
+    ) -> Result<EnvironmentVersion>;
+
+    async fn get_or_create_environment(
+        &self,
+        ml_client: &MachineLearningServicesClient,
+        resource_group: &str,
+        workspace: &str,
+    ) -> Result<EnvironmentVersion> {
+        // Try and get_environment. If it fails, create it
+
+        let env_client = ml_client.get_machine_learning_services_environment_versions_client();
+        let env_name = self.get_env_name().await?;
+        let version = self.get_env_version()?;
+
+        let environment_version =
+            get_environment(&env_client, resource_group, workspace, &env_name, &version).await;
+
+        match environment_version {
+            Ok(env) => {
+                debug!(
+                    "Environment {} version {} already exists. Using existing environment.",
+                    env_name, version
+                );
+                return Ok(env);
+            }
+            Err(_) => {
+                debug!(
+                    "Environment {} version {} does not exist. Creating environment.",
+                    env_name, version
+                );
+                return create_environment(
+                    self,
+                    ml_client,
+                    &env_client,
+                    resource_group,
+                    workspace,
+                    &env_name,
+                    &version,
+                )
+                .await;
+            }
+        };
+    }
+}
+
+const DOCKERFILE_STR: &str = r#"FROM {base_docker_image}
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
+# Setup a non-root user
+RUN groupadd --system --gid 999 nonroot \
+ && useradd --system --gid 999 --uid 999 --create-home nonroot
+
+WORKDIR /env
+ENV UV_PROJECT_ENVIRONMENT=/env/.venv
+
+# Copy from the cache instead of linking since it's a mounted volume
+ENV UV_LINK_MODE=copy
+
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    --mount=type=bind,source=.python-version,target=.python-version \
+    uv sync --locked --no-install-project
+
+WORKDIR=/workdir
+
+CMD ["bash"]
+"#;
+
+// TODO: Can we re-use these structs in the CLI?
+// Saves duplicating.
+// But how is best to combine base and specific structs
+pub struct UvEnv {
+    pub auto_rebuild: bool,
+    pub base_docker_image: String,
+    pub project_dir: PathBuf,
+    pub uv_extras: Vec<String>,
+    pub uv_groups: Vec<String>,
+}
+
+#[async_trait]
+impl Environment for UvEnv {
+    async fn get_env_name(&self) -> Result<String> {
+        // Load pyproject.toml, uv.lock, and .python-version concurrently
+        let pyproject_path = self.project_dir.join("pyproject.toml");
+        let uv_lock_path = self.project_dir.join("uv.lock");
+        let python_version_path = self.project_dir.join(".python-version");
+
+        let (pyproject_result, uv_lock_result, python_version_result) = tokio::join!(
+            fs::read_to_string(&pyproject_path),
+            fs::read_to_string(&uv_lock_path),
+            fs::read_to_string(&python_version_path)
+        );
+
+        // Provide specific error messages for missing files
+        let pyproject_contents = pyproject_result.map_err(|e| {
+            anyhow::anyhow!(
+                "Failed to read pyproject.toml at {}: {}",
+                pyproject_path.display(),
+                e
+            )
+        })?;
+
+        let uv_lock_contents = uv_lock_result.map_err(|e| {
+            anyhow::anyhow!(
+                "Failed to read uv.lock at {}: {}",
+                uv_lock_path.display(),
+                e
+            )
+        })?;
+
+        // .python-version is optional, so we don't error if it's missing
+        let python_version_contents = python_version_result.unwrap_or_else(|_| String::new());
+
+        // Hash the contents using blake3
+        let mut hasher = Hasher::new();
+        hasher.update(pyproject_contents.as_bytes());
+        hasher.update(uv_lock_contents.as_bytes());
+        hasher.update(python_version_contents.as_bytes());
+
+        // Include the configuration options in the hash
+        hasher.update(self.auto_rebuild.to_string().as_bytes());
+        for extra in &self.uv_extras {
+            hasher.update(extra.as_bytes());
+        }
+        for group in &self.uv_groups {
+            hasher.update(group.as_bytes());
+        }
+
+        let hash = hasher.finalize();
+
+        // Return hash prepended with "Fora-UV-Env-"
+        Ok(format!("Fora-UV-Env-{}", hash.to_hex()))
+    }
+
+    fn get_env_version(&self) -> Result<String> {
+        // TODO: Do properly.
+        Ok("latest".to_string())
+    }
+
+    // TODO: We need to get the default datastore so we should pass
+    // the ml client instead and create the right clients where needed
+    // Function that will be called in the functions defined in Environment
+    async fn get_envirnoment_version_body(
+        &self,
+        ml_client: &MachineLearningServicesClient,
+        resource_group: &str,
+        workspace: &str,
+        env_name: &str,
+    ) -> Result<EnvironmentVersion> {
+        // Get an upload location (lets try just throwing it in the default datastore in a new fora-env folder)
+        // And then create the EnvironmentVersion object
+
+        let default_datastore = get_default_container(ml_client, resource_group, workspace).await?;
+        // merge account_name and container_name to create the base uri for the docker build context
+        // TODO: Deal with unwrapping better
+        let docker_build_context_uri = Url::parse(
+            format!(
+                "https://{}.blob.core.windows.net/{}/fora-envs/{}",
+                default_datastore.account_name.unwrap(),
+                default_datastore.container_name.unwrap(),
+                env_name
+            )
+            .as_ref(),
+        )?;
+
+        // TODO Upload all files here
+        // Wrap in Arc to make cheaply clonable across threads
+        let base_uri = Arc::new(docker_build_context_uri.clone());
+
+        let build_context = BuildContext {
+            context_uri: Some(docker_build_context_uri.to_string()),
+            ..Default::default()
+        };
+
+        let environment_version_properties = EnvironmentVersionProperties {
+            auto_rebuild: Some(AutoRebuildSetting::OnBaseImageUpdate),
+            build: Some(build_context),
+            is_anonymous: Some(true),
+            ..Default::default()
+        };
+
+        Err(anyhow::anyhow!("Not implemented"))
+    }
+}
+
+// fn hash_folder_contents() {}
+
+// pub struct DockerEnv {
+//     docker_content_path: PathBuf,
+//     dockerfile: Option<PathBuf>,
+// }
+
+// #[async_trait]
+// impl Environment for DockerEnv {
+//     async fn get_env_name(&self) -> Result<String> {
+//         // Hash the contents of the folder to create a unique name
+//         let folder_hash = hash_folder_contents(&self.docker_content_path)?;
+//         let env_name = &fodler_hash[..32];
+//         let env_name = format!("DockerEnv-{}", env_name);
+//         Ok(env_name)
+//     }
+
+//     fn get_env_version(&self) -> Result<String> {
+//         Ok("latest".to_string())
+//     }
+
+//     // Function that will be called in the functions defined in Environment
+// }
