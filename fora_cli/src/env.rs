@@ -1,15 +1,20 @@
 use anyhow::Result;
 use async_trait::async_trait;
+use azure_core::http::RequestContent;
+use azure_identity::AzureCliCredential;
 use azure_ml::clients::MachineLearningServicesEnvironmentVersionsClient;
 use azure_ml::models::AutoRebuildSetting;
 use azure_ml::models::BuildContext;
 use azure_ml::models::EnvironmentVersion;
 use azure_ml::models::EnvironmentVersionProperties;
 use azure_ml::MachineLearningServicesClient;
+use azure_storage_blob::*;
 use blake3::Hasher;
+use futures::future::join_all;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::fs;
+use tokio::sync::Semaphore;
 use tracing::debug;
 use url::Url;
 
@@ -17,7 +22,7 @@ use crate::utils::get_default_container;
 
 // TODO Do these need to be inside the trait?
 // Feels like they could be external functions that take an `impl Environment`
-async fn create_environment<E: Environment + ?Sized>(
+pub async fn create_environment<E: Environment + ?Sized>(
     env: &E,
     ml_client: &MachineLearningServicesClient,
     env_client: &MachineLearningServicesEnvironmentVersionsClient,
@@ -29,6 +34,8 @@ async fn create_environment<E: Environment + ?Sized>(
     let environment_version_body = env
         .get_envirnoment_version_body(ml_client, resource_group, workspace, env_name)
         .await?;
+
+    debug!("Actually creating the environment in Azure ML...");
 
     let environment_version = env_client
         .create_or_update(
@@ -143,6 +150,8 @@ WORKDIR=/workdir
 CMD ["bash"]
 "#;
 
+const MAX_CONCURRENT_UPLOADS: usize = 10;
+
 // TODO: Can we re-use these structs in the CLI?
 // Saves duplicating.
 // But how is best to combine base and specific structs
@@ -227,6 +236,8 @@ impl Environment for UvEnv {
         // Get an upload location (lets try just throwing it in the default datastore in a new fora-env folder)
         // And then create the EnvironmentVersion object
 
+        debug!("Getting default datastore to use for environment file uploads...");
+
         let default_datastore = get_default_container(ml_client, resource_group, workspace).await?;
         // merge account_name and container_name to create the base uri for the docker build context
         // TODO: Deal with unwrapping better
@@ -240,9 +251,14 @@ impl Environment for UvEnv {
             .as_ref(),
         )?;
 
-        // TODO Upload all files here
-        // Wrap in Arc to make cheaply clonable across threads
-        let base_uri = Arc::new(docker_build_context_uri.clone());
+        debug!(
+            "Uploading environment files to build context location: {}",
+            docker_build_context_uri
+        );
+
+        // Upload all files to the build context location
+        self.upload_environment_files(&docker_build_context_uri)
+            .await?;
 
         let build_context = BuildContext {
             context_uri: Some(docker_build_context_uri.to_string()),
@@ -256,7 +272,224 @@ impl Environment for UvEnv {
             ..Default::default()
         };
 
-        Err(anyhow::anyhow!("Not implemented"))
+        Ok(EnvironmentVersion {
+            properties: Some(environment_version_properties),
+            ..Default::default()
+        })
+    }
+}
+
+impl UvEnv {
+    async fn upload_environment_files(&self, base_uri: &Url) -> Result<()> {
+        // Extract storage account endpoint and container from the base URI
+        let endpoint = format!(
+            "{}://{}/",
+            base_uri.scheme(),
+            base_uri
+                .host_str()
+                .ok_or_else(|| anyhow::anyhow!("No host in base URI"))?
+        );
+
+        let mut path_segments = base_uri
+            .path_segments()
+            .ok_or_else(|| anyhow::anyhow!("No path in base URI"))?
+            .filter(|s| !s.is_empty());
+
+        let container_name = path_segments
+            .next()
+            .ok_or_else(|| anyhow::anyhow!("No container in base URI"))?
+            .to_string();
+
+        let blob_prefix: String = path_segments.collect::<Vec<_>>().join("/");
+        let blob_prefix = if blob_prefix.is_empty() {
+            String::new()
+        } else {
+            format!("{}/", blob_prefix)
+        };
+
+        // Add debug output for the parsed URI components
+        debug!("Parsed endpoint: {}", endpoint);
+        debug!("Container name: {}", container_name);
+        debug!("Blob prefix: {}", blob_prefix);
+
+        // Prepare file uploads
+        let pyproject_path = self.project_dir.join("pyproject.toml");
+        let uv_lock_path = self.project_dir.join("uv.lock");
+        let python_version_path = self.project_dir.join(".python-version");
+
+        // Read files concurrently
+        let (pyproject_result, uv_lock_result, python_version_result) = tokio::join!(
+            fs::read_to_string(&pyproject_path),
+            fs::read_to_string(&uv_lock_path),
+            fs::read_to_string(&python_version_path)
+        );
+
+        let pyproject_contents = pyproject_result.map_err(|e| {
+            anyhow::anyhow!(
+                "Failed to read pyproject.toml at {}: {}",
+                pyproject_path.display(),
+                e
+            )
+        })?;
+
+        let uv_lock_contents = uv_lock_result.map_err(|e| {
+            anyhow::anyhow!(
+                "Failed to read uv.lock at {}: {}",
+                uv_lock_path.display(),
+                e
+            )
+        })?;
+
+        // Create Dockerfile with base image replacement
+        let dockerfile_contents =
+            DOCKERFILE_STR.replace("{base_docker_image}", &self.base_docker_image);
+
+        // Build the list of files to upload, excluding empty python-version
+        let mut files_to_upload = vec![
+            ("Dockerfile", dockerfile_contents),
+            ("pyproject.toml", pyproject_contents),
+            ("uv.lock", uv_lock_contents),
+        ];
+
+        // Only add .python-version if it's not empty or if the file exists
+        if let Ok(python_version_contents) = python_version_result {
+            if !python_version_contents.trim().is_empty() {
+                files_to_upload.push((".python-version", python_version_contents));
+            } else {
+                debug!(".python-version file is empty, skipping upload");
+            }
+        } else {
+            debug!(".python-version file not found, skipping upload");
+        }
+
+        debug!("Will upload {} files", files_to_upload.len());
+
+        // Prepare upload tasks
+        let endpoint = Arc::new(endpoint);
+        let container_name = Arc::new(container_name);
+        let blob_prefix = Arc::new(blob_prefix);
+        let semaphore = Arc::new(Semaphore::new(MAX_CONCURRENT_UPLOADS));
+
+        debug!(
+            "Starting upload of environment files with up to {} concurrent uploads...",
+            MAX_CONCURRENT_UPLOADS
+        );
+
+        let tasks: Vec<_> = files_to_upload
+            .into_iter()
+            .map(|(filename, content)| {
+                let endpoint = Arc::clone(&endpoint);
+                let container_name = Arc::clone(&container_name);
+                let blob_prefix = Arc::clone(&blob_prefix);
+                let semaphore = Arc::clone(&semaphore);
+                let filename = filename.to_string(); // Clone filename for logging
+
+                tokio::spawn(async move {
+                    let _permit = semaphore.acquire().await.unwrap();
+
+                    debug!("Starting upload of file: {}", filename);
+
+                    let blob_name = format!("{}{}", blob_prefix, filename);
+                    let data = content.into_bytes();
+                    let content_length = data.len() as u64;
+
+                    debug!(
+                        "Uploading {} ({} bytes) as blob: {}",
+                        filename, content_length, blob_name
+                    );
+
+                    let request_content = RequestContent::from(data);
+
+                    // Create credential per task
+                    let credential = match AzureCliCredential::new(None) {
+                        Ok(cred) => cred,
+                        Err(e) => {
+                            debug!(
+                                "Failed to create Azure CLI credential for {}: {}",
+                                filename, e
+                            );
+                            return Err(Box::new(e) as Box<dyn std::error::Error + Send + Sync>);
+                        }
+                    };
+
+                    let blob_client = match BlobClient::new(
+                        &endpoint,
+                        &container_name,
+                        &blob_name,
+                        Some(Arc::new(credential)),
+                        Some(BlobClientOptions::default()),
+                    ) {
+                        Ok(client) => client,
+                        Err(e) => {
+                            debug!("Failed to create blob client for {}: {}", filename, e);
+                            return Err(Box::new(e) as Box<dyn std::error::Error + Send + Sync>);
+                        }
+                    };
+
+                    match blob_client
+                        .upload(
+                            request_content,
+                            true, // overwrite
+                            content_length,
+                            None, // upload options
+                        )
+                        .await
+                    {
+                        Ok(_) => {
+                            debug!("Successfully uploaded: {} as {}", filename, blob_name);
+                            Ok(blob_name)
+                        }
+                        Err(e) => {
+                            debug!("Failed to upload {}: {}", filename, e);
+                            Err(Box::new(e) as Box<dyn std::error::Error + Send + Sync>)
+                        }
+                    }
+                })
+            })
+            .collect();
+
+        debug!("Spawned {} upload tasks", tasks.len());
+
+        let results = join_all(tasks).await;
+
+        // Better error handling and logging
+        let mut failed_uploads = Vec::new();
+        let mut successful_uploads = Vec::new();
+
+        for (i, result) in results.into_iter().enumerate() {
+            match result {
+                Ok(inner_result) => match inner_result {
+                    Ok(blob_name) => {
+                        successful_uploads.push(blob_name);
+                    }
+                    Err(e) => {
+                        failed_uploads.push(format!("Upload task {}: {}", i, e));
+                    }
+                },
+                Err(join_err) => {
+                    failed_uploads.push(format!("Task {} panicked: {}", i, join_err));
+                }
+            }
+        }
+
+        debug!(
+            "Upload results: {} successful, {} failed",
+            successful_uploads.len(),
+            failed_uploads.len()
+        );
+
+        if !failed_uploads.is_empty() {
+            for failure in &failed_uploads {
+                debug!("Upload failure: {}", failure);
+            }
+            return Err(anyhow::anyhow!("{} uploads failed", failed_uploads.len()));
+        }
+
+        debug!(
+            "Successfully uploaded all environment files: {:?}",
+            successful_uploads
+        );
+        Ok(())
     }
 }
 
