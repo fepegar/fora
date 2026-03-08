@@ -84,7 +84,7 @@ pub struct SubmitArgs {
     pub uv_args: UvArgs,
 
     #[arg(num_args = 1.., trailing_var_arg = true)]
-    pub cmd: Vec<String>,
+    pub args: Vec<String>,
 }
 
 #[derive(clap::ValueEnum, Clone, Debug, Default)]

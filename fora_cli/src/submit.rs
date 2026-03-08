@@ -73,6 +73,16 @@ pub async fn submit_to_azure(args: &SubmitArgs) -> Result<()> {
     let code_version = code_version_result?;
     let environment_version = env_version_result?;
 
+    submit_job(
+        &ml_client,
+        resource_group,
+        workspace,
+        &code_version,
+        &environment_version,
+        args,
+    )
+    .await?;
+
     Ok(())
 }
 
@@ -102,18 +112,18 @@ async fn submit_job(
 
     let command = format!(
         "{} {} {}",
-        args.command_prefix.unwrap_or("".to_string()),
-        args.executable.unwrap_or("python".to_string()),
-        args.cmd.join(" ")
+        args.command_prefix.clone().unwrap_or("".to_string()),
+        args.executable.clone().unwrap_or("python".to_string()),
+        args.args.join(" ")
     );
 
     let command_job = CommandJob {
-        code_id: Some(code_version.id.unwrap()),
+        code_id: code_version.id.clone(),
         command: Some(command),
         compute_id: Some(compute_id),
-        display_name: args.name,
+        display_name: args.name.clone(),
         // distribution: None, // TODO: Support distribution
-        environment_id: Some(environment_version.id.unwrap()),
+        environment_id: environment_version.id.clone(),
         environment_variables: None, // TODO: Support environment variables
         experiment_name: Some(args.experiment.clone()),
         // inputs: None, // TODO: Support inputs

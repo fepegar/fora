@@ -97,39 +97,41 @@ pub trait Environment: Sync {
         let environment_version =
             get_environment(&env_client, resource_group, workspace, &env_name, &version).await;
 
-        match environment_version {
-            Ok(env) => {
-                debug!(
-                    "Environment {} version {} already exists. Using existing environment.",
-                    env_name, version
-                );
-                // TODO: Check the status. If failed, then maybe try to build again?
-                return Ok(env);
-            }
-            Err(_) => {
-                debug!(
-                    "Environment {} version {} does not exist. Creating environment.",
-                    env_name, version
-                );
-                let env = create_environment(
-                    self,
-                    ml_client,
-                    &env_client,
-                    resource_group,
-                    workspace,
-                    &env_name,
-                    &version,
-                )
-                .await?;
+        // match environment_version {
+        //     Ok(env) => {
+        //         debug!(
+        //             "Environment {} version {} already exists. Using existing environment.",
+        //             env_name, version
+        //         );
+        //         // TODO: Check the status. If failed, then maybe try to build again?
+        //         return Ok(env);
+        //     }
+        //     Err(_) => {
+        //         debug!(
+        //             "Environment {} version {} does not exist. Creating environment.",
+        //             env_name, version
+        //         );
 
-                debug!(
-                    "Environment {} version {} created successfully.",
-                    env_name, version
-                );
+        // NOTE: Temporarily always try to create a new enironment
+        let env = create_environment(
+            self,
+            ml_client,
+            &env_client,
+            resource_group,
+            workspace,
+            &env_name,
+            &version,
+        )
+        .await?;
 
-                return Ok(env);
-            }
-        };
+        debug!(
+            "Environment {} version {} created successfully.",
+            env_name, version
+        );
+
+        return Ok(env);
+        //     }
+        // };
     }
 }
 
@@ -228,7 +230,7 @@ impl Environment for UvEnv {
 
     fn get_env_version(&self) -> Result<String> {
         // TODO: Do properly.
-        Ok("latest".to_string())
+        Ok("tmp".to_string())
     }
 
     // TODO: We need to get the default datastore so we should pass
@@ -250,6 +252,11 @@ impl Environment for UvEnv {
         let build_context_uri = self
             .upload_environment_files(ml_client, resource_group, workspace)
             .await?;
+
+        debug!(
+            "Environment files uploaded successfully. Build context URI: {}",
+            build_context_uri
+        );
 
         let build_context = BuildContext {
             context_uri: Some(build_context_uri),
@@ -514,6 +521,11 @@ impl UvEnv {
         let blob_uri = blob_reference
             .blob_uri
             .ok_or_else(|| anyhow::anyhow!("No blob URI in reference"))?;
+
+        // blob uri is like https://{name}.blob.core.windows.net:443/{container}
+        // We need to remove the port
+        let blob_uri = blob_uri.replace(":443", "");
+
         Ok(blob_uri)
     }
 }
