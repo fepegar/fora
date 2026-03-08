@@ -1,12 +1,13 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use azure_core::http::RequestContent;
-use azure_identity::AzureCliCredential;
+
 use azure_ml::clients::MachineLearningServicesEnvironmentVersionsClient;
 use azure_ml::models::AutoRebuildSetting;
 use azure_ml::models::BuildContext;
 use azure_ml::models::EnvironmentVersion;
 use azure_ml::models::EnvironmentVersionProperties;
+use azure_ml::models::PendingUploadRequestDto;
 use azure_ml::MachineLearningServicesClient;
 use azure_storage_blob::*;
 use blake3::Hasher;
@@ -17,8 +18,7 @@ use tokio::fs;
 use tokio::sync::Semaphore;
 use tracing::debug;
 use url::Url;
-
-use crate::utils::get_default_container;
+use uuid;
 
 // TODO Do these need to be inside the trait?
 // Feels like they could be external functions that take an `impl Environment`
@@ -103,6 +103,7 @@ pub trait Environment: Sync {
                     "Environment {} version {} already exists. Using existing environment.",
                     env_name, version
                 );
+                // TODO: Check the status. If failed, then maybe try to build again?
                 return Ok(env);
             }
             Err(_) => {
@@ -110,7 +111,7 @@ pub trait Environment: Sync {
                     "Environment {} version {} does not exist. Creating environment.",
                     env_name, version
                 );
-                return create_environment(
+                let env = create_environment(
                     self,
                     ml_client,
                     &env_client,
@@ -119,7 +120,14 @@ pub trait Environment: Sync {
                     &env_name,
                     &version,
                 )
-                .await;
+                .await?;
+
+                debug!(
+                    "Environment {} version {} created successfully.",
+                    env_name, version
+                );
+
+                return Ok(env);
             }
         };
     }
@@ -236,32 +244,15 @@ impl Environment for UvEnv {
         // Get an upload location (lets try just throwing it in the default datastore in a new fora-env folder)
         // And then create the EnvironmentVersion object
 
-        debug!("Getting default datastore to use for environment file uploads...");
+        debug!("Starting environment files upload using SAS token approach...");
 
-        let default_datastore = get_default_container(ml_client, resource_group, workspace).await?;
-        // merge account_name and container_name to create the base uri for the docker build context
-        // TODO: Deal with unwrapping better
-        let docker_build_context_uri = Url::parse(
-            format!(
-                "https://{}.blob.core.windows.net/{}/fora-envs/{}",
-                default_datastore.account_name.unwrap(),
-                default_datastore.container_name.unwrap(),
-                env_name
-            )
-            .as_ref(),
-        )?;
-
-        debug!(
-            "Uploading environment files to build context location: {}",
-            docker_build_context_uri
-        );
-
-        // Upload all files to the build context location
-        self.upload_environment_files(&docker_build_context_uri)
+        // Upload all files using SAS token approach
+        let build_context_uri = self
+            .upload_environment_files(ml_client, resource_group, workspace)
             .await?;
 
         let build_context = BuildContext {
-            context_uri: Some(docker_build_context_uri.to_string()),
+            context_uri: Some(build_context_uri),
             ..Default::default()
         };
 
@@ -280,42 +271,90 @@ impl Environment for UvEnv {
 }
 
 impl UvEnv {
-    async fn upload_environment_files(&self, base_uri: &Url) -> Result<()> {
-        // Extract storage account endpoint and container from the base URI
-        let endpoint = format!(
-            "{}://{}/",
-            base_uri.scheme(),
-            base_uri
+    async fn upload_environment_files(
+        &self,
+        ml_client: &MachineLearningServicesClient,
+        resource_group: &str,
+        workspace: &str,
+    ) -> Result<String> {
+        // Request a SAS URL using the code versions API
+        debug!("Requesting SAS URL for environment files upload...");
+
+        let code_client = ml_client.get_machine_learning_services_code_versions_client();
+        let container_name = uuid::Uuid::new_v4().to_string();
+        let dto = PendingUploadRequestDto {
+            ..Default::default()
+        };
+        let body: RequestContent<PendingUploadRequestDto> = dto.try_into()?;
+
+        let pending_upload = code_client
+            .create_or_get_start_pending_upload(
+                resource_group,
+                workspace,
+                &container_name,
+                "latest",
+                body,
+                None,
+            )
+            .await?
+            .into_model()?;
+
+        let blob_reference = pending_upload
+            .blob_reference_for_consumption
+            .ok_or_else(|| anyhow::anyhow!("Blob reference should be present in pending upload"))?;
+
+        debug!("Got SAS URL for upload: {:?}", blob_reference.credential);
+
+        // Prepare environment files to upload
+        let pyproject_path = self.project_dir.join("pyproject.toml");
+        let uv_lock_path = self.project_dir.join("uv.lock");
+        let python_version_path = self.project_dir.join(".python-version");
+
+        // Parse SAS URI to get upload location
+        let upload_credential = blob_reference
+            .credential
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("No credential in blob reference"))?;
+
+        let sas_uri_str = match upload_credential {
+            azure_ml::models::PendingUploadCredentialDto::SASCredentialDto(sas) => sas
+                .sas_uri
+                .as_ref()
+                .ok_or_else(|| anyhow::anyhow!("No SAS URI in credential"))?,
+            azure_ml::models::PendingUploadCredentialDto::UnknownCredentialType {
+                credential_type,
+            } => {
+                return Err(anyhow::anyhow!(
+                    "Unsupported credential type for upload: {:?}",
+                    credential_type
+                ));
+            }
+        };
+
+        debug!("Using SAS URI: {}", sas_uri_str);
+
+        let sas_uri = Url::parse(sas_uri_str)?;
+        let endpoint_with_sas = format!(
+            "{}://{}",
+            sas_uri.scheme(),
+            sas_uri
                 .host_str()
-                .ok_or_else(|| anyhow::anyhow!("No host in base URI"))?
+                .ok_or_else(|| anyhow::anyhow!("No host in SAS URI"))?
         );
 
-        let mut path_segments = base_uri
+        let mut path_segments = sas_uri
             .path_segments()
-            .ok_or_else(|| anyhow::anyhow!("No path in base URI"))?
+            .ok_or_else(|| anyhow::anyhow!("No path in SAS URI"))?
             .filter(|s| !s.is_empty());
 
         let container_name = path_segments
             .next()
-            .ok_or_else(|| anyhow::anyhow!("No container in base URI"))?
+            .ok_or_else(|| anyhow::anyhow!("No container in SAS URI"))?
             .to_string();
 
-        let blob_prefix: String = path_segments.collect::<Vec<_>>().join("/");
-        let blob_prefix = if blob_prefix.is_empty() {
-            String::new()
-        } else {
-            format!("{}/", blob_prefix)
-        };
-
-        // Add debug output for the parsed URI components
-        debug!("Parsed endpoint: {}", endpoint);
-        debug!("Container name: {}", container_name);
-        debug!("Blob prefix: {}", blob_prefix);
-
-        // Prepare file uploads
-        let pyproject_path = self.project_dir.join("pyproject.toml");
-        let uv_lock_path = self.project_dir.join("uv.lock");
-        let python_version_path = self.project_dir.join(".python-version");
+        let sas_token = sas_uri
+            .query()
+            .ok_or_else(|| anyhow::anyhow!("No SAS token in URI"))?;
 
         // Read files concurrently
         let (pyproject_result, uv_lock_result, python_version_result) = tokio::join!(
@@ -364,23 +403,21 @@ impl UvEnv {
 
         debug!("Will upload {} files", files_to_upload.len());
 
-        // Prepare upload tasks
-        let endpoint = Arc::new(endpoint);
+        // Prepare upload tasks using SAS token
+        let endpoint_with_sas = Arc::new(format!("{}?{}", endpoint_with_sas, sas_token));
         let container_name = Arc::new(container_name);
-        let blob_prefix = Arc::new(blob_prefix);
         let semaphore = Arc::new(Semaphore::new(MAX_CONCURRENT_UPLOADS));
 
         debug!(
-            "Starting upload of environment files with up to {} concurrent uploads...",
+            "Starting upload of environment files with up to {} concurrent uploads using SAS...",
             MAX_CONCURRENT_UPLOADS
         );
 
         let tasks: Vec<_> = files_to_upload
             .into_iter()
             .map(|(filename, content)| {
-                let endpoint = Arc::clone(&endpoint);
+                let endpoint_with_sas = Arc::clone(&endpoint_with_sas);
                 let container_name = Arc::clone(&container_name);
-                let blob_prefix = Arc::clone(&blob_prefix);
                 let semaphore = Arc::clone(&semaphore);
                 let filename = filename.to_string(); // Clone filename for logging
 
@@ -389,7 +426,7 @@ impl UvEnv {
 
                     debug!("Starting upload of file: {}", filename);
 
-                    let blob_name = format!("{}{}", blob_prefix, filename);
+                    let blob_name = filename.clone();
                     let data = content.into_bytes();
                     let content_length = data.len() as u64;
 
@@ -400,31 +437,14 @@ impl UvEnv {
 
                     let request_content = RequestContent::from(data);
 
-                    // Create credential per task
-                    let credential = match AzureCliCredential::new(None) {
-                        Ok(cred) => cred,
-                        Err(e) => {
-                            debug!(
-                                "Failed to create Azure CLI credential for {}: {}",
-                                filename, e
-                            );
-                            return Err(Box::new(e) as Box<dyn std::error::Error + Send + Sync>);
-                        }
-                    };
-
-                    let blob_client = match BlobClient::new(
-                        &endpoint,
+                    // Use SAS token - no credential needed
+                    let blob_client = BlobClient::new(
+                        &endpoint_with_sas,
                         &container_name,
                         &blob_name,
-                        Some(Arc::new(credential)),
+                        None::<Arc<dyn azure_core::credentials::TokenCredential>>,
                         Some(BlobClientOptions::default()),
-                    ) {
-                        Ok(client) => client,
-                        Err(e) => {
-                            debug!("Failed to create blob client for {}: {}", filename, e);
-                            return Err(Box::new(e) as Box<dyn std::error::Error + Send + Sync>);
-                        }
-                    };
+                    )?;
 
                     match blob_client
                         .upload(
@@ -489,7 +509,12 @@ impl UvEnv {
             "Successfully uploaded all environment files: {:?}",
             successful_uploads
         );
-        Ok(())
+
+        // Return the blob URI for the build context
+        let blob_uri = blob_reference
+            .blob_uri
+            .ok_or_else(|| anyhow::anyhow!("No blob URI in reference"))?;
+        Ok(blob_uri)
     }
 }
 

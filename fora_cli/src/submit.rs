@@ -1,8 +1,12 @@
 use anyhow::anyhow;
 use anyhow::Result;
 use azure_identity::AzureCliCredential;
+use azure_ml::models::CodeVersion;
+use azure_ml::models::CommandJob;
+use azure_ml::models::EnvironmentVersion;
+use azure_ml::models::JobBase;
+use azure_ml::models::JobBaseProperties;
 use azure_ml::MachineLearningServicesClient;
-use futures::future::join_all;
 
 use crate::cli::EnvironmentType;
 use crate::cli::SubmitArgs;
@@ -64,7 +68,77 @@ pub async fn submit_to_azure(args: &SubmitArgs) -> Result<()> {
 
     let env_future = env.get_or_create_environment(&ml_client, resource_group, workspace);
 
-    let (_code_version_result, _env_result) = futures::join!(code_version_future, env_future);
+    let (code_version_result, env_version_result) = futures::join!(code_version_future, env_future);
+
+    let code_version = code_version_result?;
+    let environment_version = env_version_result?;
+
+    Ok(())
+}
+
+async fn submit_job(
+    ml_client: &MachineLearningServicesClient,
+    resouce_group: &str,
+    workspace: &str,
+    code_version: &CodeVersion,
+    environment_version: &EnvironmentVersion,
+    args: &SubmitArgs,
+) -> Result<()> {
+    let jobs_client = ml_client.get_machine_learning_services_jobs_client();
+
+    let run_id = names::Generator::default()
+        .next()
+        .unwrap()
+        .to_string()
+        .to_lowercase();
+
+    let compute_id = format!(
+        "/subscriptions/{}/resourceGroups/{}/providers/Microsoft.MachineLearningServices/workspaces/{}/computes/{}",
+        args.subscription,
+        resouce_group,
+        workspace,
+        &args.cluster,
+    );
+
+    let command = format!(
+        "{} {} {}",
+        args.command_prefix.unwrap_or("".to_string()),
+        args.executable.unwrap_or("python".to_string()),
+        args.cmd.join(" ")
+    );
+
+    let command_job = CommandJob {
+        code_id: Some(code_version.id.unwrap()),
+        command: Some(command),
+        compute_id: Some(compute_id),
+        display_name: args.name,
+        // distribution: None, // TODO: Support distribution
+        environment_id: Some(environment_version.id.unwrap()),
+        environment_variables: None, // TODO: Support environment variables
+        experiment_name: Some(args.experiment.clone()),
+        // inputs: None, // TODO: Support inputs
+        // outputs: None, // TODO: Support outputs
+        // resources: None, // TODO: Support resource requirements - used for num_nodes, etc.
+        ..Default::default()
+    };
+
+    let job_properties = JobBaseProperties::CommandJob(command_job);
+
+    let job_body = JobBase {
+        properties: Some(job_properties),
+        ..Default::default()
+    };
+
+    let _job_result = jobs_client
+        .create_or_update(
+            resouce_group,
+            workspace,
+            &run_id,
+            job_body.try_into()?,
+            None,
+        )
+        .await?
+        .into_model();
 
     Ok(())
 }

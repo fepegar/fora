@@ -45,6 +45,20 @@ pub struct SubmitArgs {
     )]
     pub source: Option<PathBuf>,
 
+    #[arg(
+        long,
+        help = "Command prefix to prepend to the job command. Useful for setting up environment variables or running under a profiler",
+        default_value = "uv run"
+    )]
+    pub command_prefix: Option<String>,
+
+    #[arg(
+        long,
+        help = "Executable to use for the job. If not specified, the default is `python`",
+        default_value = "python"
+    )]
+    pub executable: Option<String>,
+
     #[arg(long, short, help = "Azure ML compute cluster to submit the job to")]
     pub cluster: String,
 
@@ -68,6 +82,9 @@ pub struct SubmitArgs {
 
     #[command(flatten)]
     pub uv_args: UvArgs,
+
+    #[arg(num_args = 1.., trailing_var_arg = true)]
+    pub cmd: Vec<String>,
 }
 
 #[derive(clap::ValueEnum, Clone, Debug, Default)]
