@@ -1,0 +1,24 @@
+[package]
+name = "azure_tui"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.88"
+
+[dependencies]
+azure_ml = { path = "../azure_ml" }
+azure_core = { workspace = true }
+azure_identity = { workspace = true }
+ratatui = { workspace = true }
+crossterm = { workspace = true }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+dirs = { workspace = true }
+futures = { workspace = true }
+async-trait = { workspace = true }
+anyhow = "1.0"
+toml = "0.8"
+unicode-width = "0.2"

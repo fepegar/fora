@@ -1,5 +1,5 @@
 use anyhow::Result;
-use clap::{CommandFactory, Parser};
+use clap::Parser;
 use tracing_subscriber::EnvFilter;
 
 mod cli;
@@ -25,8 +25,7 @@ async fn main() -> Result<()> {
             submit_to_azure(&args).await?;
         }
         None => {
-            let mut cmd = Cli::command();
-            cmd.print_long_help()?;
+            azure_tui::run().await?;
         }
     }
     Ok(())

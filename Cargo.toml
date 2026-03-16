@@ -1,7 +1,7 @@
 [workspace]
 members = [
     "azure_ml",
-    "fora_tui",
+    "azure_tui",
     "fora_cli"
 ]
 resolver = "2"
