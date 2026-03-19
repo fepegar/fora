@@ -28,9 +28,7 @@ pub struct JobsState {
 
 impl Default for JobsState {
     fn default() -> Self {
-        Self {
-            detail_open: false,
-        }
+        Self { detail_open: false }
     }
 }
 

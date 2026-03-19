@@ -10,11 +10,7 @@ use super::state::ComputeRow;
 /// Fetches all compute resources from the workspace.
 pub async fn fetch_compute(client: &AzureClient) -> Result<Vec<ComputeRow>> {
     let compute_client = client.compute();
-    let mut pager = compute_client.list(
-        client.resource_group(),
-        client.workspace_name(),
-        None,
-    )?;
+    let mut pager = compute_client.list(client.resource_group(), client.workspace_name(), None)?;
 
     let mut rows = Vec::new();
     while let Some(result) = pager.next().await {

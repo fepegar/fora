@@ -59,11 +59,7 @@ pub fn render_compute_detail(frame: &mut Frame, area: Rect, compute: &ComputeRow
 
     lines.push(Line::from(""));
     add_section(&mut lines, "Nodes");
-    add_field(
-        &mut lines,
-        "Current",
-        &opt_i32(compute.current_node_count),
-    );
+    add_field(&mut lines, "Current", &opt_i32(compute.current_node_count));
     add_field(&mut lines, "Min", &opt_i32(compute.min_nodes));
     add_field(&mut lines, "Max", &opt_i32(compute.max_nodes));
     add_field(&mut lines, "Idle", &opt_i32(compute.idle_nodes));
@@ -101,10 +97,7 @@ fn add_section(lines: &mut Vec<Line<'_>>, title: &'static str) {
 
 fn add_field(lines: &mut Vec<Line<'_>>, label: &str, value: &str) {
     lines.push(Line::from(vec![
-        Span::styled(
-            format!("  {}: ", label),
-            Style::default().fg(Theme::DIM),
-        ),
+        Span::styled(format!("  {}: ", label), Style::default().fg(Theme::DIM)),
         Span::styled(value.to_string(), Style::default().fg(Theme::FG)),
     ]));
 }

@@ -155,11 +155,9 @@ impl Tab for ComputeTab {
 
     fn render(&mut self, frame: &mut Frame, area: Rect) {
         if self.state.detail_open {
-            let chunks = Layout::horizontal([
-                Constraint::Percentage(50),
-                Constraint::Percentage(50),
-            ])
-            .split(area);
+            let chunks =
+                Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)])
+                    .split(area);
 
             self.render_list(frame, chunks[0]);
 
@@ -230,11 +228,7 @@ impl ComputeTab {
         };
 
         let block = Block::default()
-            .title(format!(
-                " Compute [{}]{} ",
-                self.all_compute.len(),
-                loading
-            ))
+            .title(format!(" Compute [{}]{} ", self.all_compute.len(), loading))
             .borders(Borders::ALL)
             .border_style(theme::border_style(true));
 

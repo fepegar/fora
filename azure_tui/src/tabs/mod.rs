@@ -1,9 +1,11 @@
 pub mod compute;
+pub mod experiments;
 pub mod jobs;
+pub mod recent_jobs;
 
 use crossterm::event::KeyEvent;
-use ratatui::Frame;
 use ratatui::layout::Rect;
+use ratatui::Frame;
 use tokio::sync::mpsc;
 
 use crate::app::Action;

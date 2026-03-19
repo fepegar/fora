@@ -111,7 +111,10 @@ pub fn render_table<T>(
 }
 
 /// Determine which columns fit in the available width, cropping from the right.
-fn get_visible_columns<'a, T>(columns: &'a [ColumnDef<T>], available_width: u16) -> Vec<&'a ColumnDef<T>> {
+fn get_visible_columns<'a, T>(
+    columns: &'a [ColumnDef<T>],
+    available_width: u16,
+) -> Vec<&'a ColumnDef<T>> {
     let mut sorted: Vec<&ColumnDef<T>> = columns.iter().filter(|c| c.visible).collect();
     sorted.sort_by_key(|c| c.order);
 

@@ -2,7 +2,8 @@
 members = [
     "azure_ml",
     "azure_tui",
-    "fora_cli"
+    "fora_cli",
+    "mlflow"
 ]
 resolver = "2"
 

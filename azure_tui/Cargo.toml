@@ -6,6 +6,7 @@ rust-version = "1.88"
 
 [dependencies]
 azure_ml = { path = "../azure_ml" }
+mlflow = { path = "../mlflow" }
 azure_core = { workspace = true }
 azure_identity = { workspace = true }
 ratatui = { workspace = true }

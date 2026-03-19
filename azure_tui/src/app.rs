@@ -2,11 +2,12 @@ use std::io;
 use std::time::Duration;
 
 use anyhow::Result;
+use chrono::{DateTime, Utc};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use crossterm::terminal::{
-    EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode,
-};
 use crossterm::execute;
+use crossterm::terminal::{
+    disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
+};
 use ratatui::backend::CrosstermBackend;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
@@ -22,23 +23,51 @@ use crate::components::workspace_picker::{centered_rect, WorkspacePicker};
 use crate::config::AppConfig;
 use crate::event::{Event, EventHandler};
 use crate::tabs::compute::ComputeTab;
-use crate::tabs::jobs::JobsTab;
+use crate::tabs::experiments::ExperimentsTab;
+use crate::tabs::recent_jobs::state::RecentJobRow;
+use crate::tabs::recent_jobs::RecentJobsTab;
 use crate::tabs::Tab;
 use crate::theme::Theme;
 
-use crate::tabs::jobs::state::JobRow;
 use crate::tabs::compute::state::ComputeRow;
+use std::collections::HashMap;
 
 /// Actions dispatched by tabs and components back to the app.
 #[derive(Debug, Clone)]
 pub enum Action {
-    JobsBatchLoaded(Vec<JobRow>),
+    // Legacy Jobs tab (kept for compilation; tab no longer shown)
+    JobsBatchLoaded(Vec<crate::tabs::jobs::state::JobRow>),
     JobsFetchPaused,
     JobsFetchComplete,
-    JobsUpdated(Vec<JobRow>),
-    JobsNewPrepended(Vec<JobRow>),
-    ComputeLoaded(Vec<ComputeRow>),
+    JobsUpdated(Vec<crate::tabs::jobs::state::JobRow>),
+    JobsNewPrepended(Vec<crate::tabs::jobs::state::JobRow>),
     JobCancelled(String),
+
+    // Recent Jobs tab
+    RecentJobsBatchLoaded(Vec<RecentJobRow>),
+    RecentJobsFetchComplete,
+    RecentJobEnriched {
+        job_id: String,
+        compute_target: Option<String>,
+        job_type: Option<String>,
+        command: Option<String>,
+        environment_id: Option<String>,
+        description: Option<String>,
+        tags: HashMap<String, String>,
+    },
+
+    // Experiments tab
+    ExperimentsDiscovered(Vec<(String, String, Option<DateTime<Utc>>)>),
+    ExperimentDiscoveryComplete,
+    ExperimentJobsLoaded {
+        experiment_id: String,
+        jobs: Vec<RecentJobRow>,
+    },
+
+    // Compute tab
+    ComputeLoaded(Vec<ComputeRow>),
+
+    // Shared
     Error(String),
     RefreshRequested,
     SaveColumnConfig {
@@ -67,7 +96,8 @@ impl App {
 
         let show_help_bar = config.ui.show_help_bar;
         let refresh_interval = config.ui.refresh_interval_secs;
-        let show_no_config = config.workspaces.is_empty();
+        let show_no_config = config.workspaces.is_empty() || config.username.is_empty();
+        let username = config.username.clone();
 
         // Try to create a client from the first workspace if available
         let client = config.workspaces.first().and_then(|ws| {
@@ -79,8 +109,17 @@ impl App {
         let active_workspace_idx = if client.is_some() { Some(0) } else { None };
 
         let tabs: Vec<Box<dyn Tab>> = vec![
-            Box::new(JobsTab::new(client.clone(), refresh_interval, config.columns.jobs.as_deref())),
-            Box::new(ComputeTab::new(client, refresh_interval, config.columns.compute.as_deref())),
+            Box::new(RecentJobsTab::new(
+                client.clone(),
+                username.clone(),
+                config.columns.jobs.as_deref(),
+            )),
+            Box::new(ExperimentsTab::new(client.clone())),
+            Box::new(ComputeTab::new(
+                client,
+                refresh_interval,
+                config.columns.compute.as_deref(),
+            )),
         ];
 
         let workspace_picker = WorkspacePicker::new(config.workspaces.clone());
@@ -184,8 +223,8 @@ impl App {
 
         // Error bar
         if let Some(ref err) = self.error_message {
-            let error = Paragraph::new(format!(" ⚠ {}", err))
-                .style(Style::default().fg(Theme::ERROR));
+            let error =
+                Paragraph::new(format!(" ⚠ {}", err)).style(Style::default().fg(Theme::ERROR));
             frame.render_widget(error, chunks[idx]);
         }
 
@@ -268,7 +307,7 @@ impl App {
             }
             Action::SaveColumnConfig { tab, columns } => {
                 match tab.as_str() {
-                    "jobs" => {
+                    "recent_jobs" | "jobs" => {
                         self.config.columns.jobs = Some(columns.clone());
                     }
                     "compute" => {
@@ -298,15 +337,23 @@ impl App {
                     // Recreate tabs with new client
                     let refresh = self.config.ui.refresh_interval_secs;
                     self.tabs = vec![
-                        Box::new(JobsTab::new(Some(client.clone()), refresh, self.config.columns.jobs.as_deref())),
-                        Box::new(ComputeTab::new(Some(client), refresh, self.config.columns.compute.as_deref())),
+                        Box::new(RecentJobsTab::new(
+                            Some(client.clone()),
+                            self.config.username.clone(),
+                            self.config.columns.jobs.as_deref(),
+                        )),
+                        Box::new(ExperimentsTab::new(Some(client.clone()))),
+                        Box::new(ComputeTab::new(
+                            Some(client),
+                            refresh,
+                            self.config.columns.compute.as_deref(),
+                        )),
                     ];
 
                     tracing::info!("Switched to workspace: {}", ws.name);
                 }
                 Err(e) => {
-                    self.error_message =
-                        Some(format!("Failed to connect to workspace: {}", e));
+                    self.error_message = Some(format!("Failed to connect to workspace: {}", e));
                 }
             }
         }
@@ -349,10 +396,12 @@ fn render_no_config_popup(frame: &mut ratatui::Frame, area: Rect) {
                 .add_modifier(Modifier::BOLD),
         )),
         Line::from(""),
+        Line::from(Span::styled("Example:", Style::default().fg(Theme::DIM))),
         Line::from(Span::styled(
-            "Example:",
-            Style::default().fg(Theme::DIM),
+            "  username = \"Your Name\"",
+            Style::default().fg(Theme::FG),
         )),
+        Line::from(""),
         Line::from(Span::styled(
             "  [[workspaces]]",
             Style::default().fg(Theme::FG),
@@ -371,6 +420,10 @@ fn render_no_config_popup(frame: &mut ratatui::Frame, area: Rect) {
         )),
         Line::from(Span::styled(
             "  workspace_name = \"my-workspace\"",
+            Style::default().fg(Theme::FG),
+        )),
+        Line::from(Span::styled(
+            "  region = \"eastus2\"",
             Style::default().fg(Theme::FG),
         )),
         Line::from(""),

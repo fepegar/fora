@@ -17,9 +17,7 @@ use crate::widgets::table::{self, ListState};
 
 use super::columns::default_columns;
 use super::detail::render_job_detail;
-use super::fetch::{
-    self, JobFetcherHandle, INITIAL_LOAD, PREFETCH_LOAD, PREFETCH_THRESHOLD,
-};
+use super::fetch::{self, JobFetcherHandle, INITIAL_LOAD, PREFETCH_LOAD, PREFETCH_THRESHOLD};
 use super::state::{FetchState, JobRow, JobsState};
 
 pub struct JobsTab {
@@ -140,8 +138,7 @@ impl JobsTab {
 
         // Determine the visible range in filtered_jobs
         let offset = self.list_state.table_state.offset();
-        let visible_end =
-            (offset + self.visible_height as usize).min(self.filtered_jobs.len());
+        let visible_end = (offset + self.visible_height as usize).min(self.filtered_jobs.len());
 
         // Collect IDs of visible jobs
         let mut ids_to_refresh: Vec<String> = self.filtered_jobs[offset..visible_end]
@@ -160,8 +157,7 @@ impl JobsTab {
 
         // Check for new jobs if the top of the list is visible
         let check_new = offset == 0;
-        let known_ids: HashSet<String> =
-            self.all_jobs.iter().map(|j| j.id.clone()).collect();
+        let known_ids: HashSet<String> = self.all_jobs.iter().map(|j| j.id.clone()).collect();
 
         let tx = action_tx.clone();
         fetch::refresh_visible_jobs(client, ids_to_refresh, check_new, known_ids, tx);
@@ -196,9 +192,12 @@ impl JobsTab {
 
         tokio::spawn(async move {
             let jobs_client = client.jobs();
-            match jobs_client
-                .cancel(client.resource_group(), client.workspace_name(), &job_id, None)
-            {
+            match jobs_client.cancel(
+                client.resource_group(),
+                client.workspace_name(),
+                &job_id,
+                None,
+            ) {
                 Ok(_) => {
                     let _ = tx.send(Action::JobCancelled(job_id));
                 }
@@ -313,10 +312,8 @@ impl Tab for JobsTab {
             }
             KeyCode::Char('x') => {
                 if let Some(job) = self.selected_job() {
-                    self.confirm_cancel.show(format!(
-                        "Cancel job '{}'?",
-                        job.display_name
-                    ));
+                    self.confirm_cancel
+                        .show(format!("Cancel job '{}'?", job.display_name));
                 }
                 true
             }
@@ -343,8 +340,7 @@ impl Tab for JobsTab {
                     if let Some(job) = self.all_jobs.iter_mut().find(|j| j.id == updated.id) {
                         *job = updated.clone();
                     }
-                    if let Some(job) = self.filtered_jobs.iter_mut().find(|j| j.id == updated.id)
-                    {
+                    if let Some(job) = self.filtered_jobs.iter_mut().find(|j| j.id == updated.id) {
                         *job = updated.clone();
                     }
                 }
@@ -366,8 +362,7 @@ impl Tab for JobsTab {
                     // the filter, so the cursor stays on the same job
                     if let Some(sel) = old_selected {
                         // Count how many of the new jobs appear in filtered_jobs
-                        let new_ids: HashSet<&str> =
-                            rows.iter().map(|j| j.id.as_str()).collect();
+                        let new_ids: HashSet<&str> = rows.iter().map(|j| j.id.as_str()).collect();
                         let new_in_filter = self
                             .filtered_jobs
                             .iter()
@@ -375,9 +370,9 @@ impl Tab for JobsTab {
                             .filter(|j| new_ids.contains(j.id.as_str()))
                             .count();
                         let new_sel = sel + new_in_filter;
-                        self.list_state
-                            .table_state
-                            .select(Some(new_sel.min(self.filtered_jobs.len().saturating_sub(1))));
+                        self.list_state.table_state.select(Some(
+                            new_sel.min(self.filtered_jobs.len().saturating_sub(1)),
+                        ));
                     }
                 }
                 self.auto_refreshing = false;
@@ -391,11 +386,9 @@ impl Tab for JobsTab {
 
     fn render(&mut self, frame: &mut Frame, area: Rect) {
         if self.state.detail_open {
-            let chunks = Layout::horizontal([
-                Constraint::Percentage(50),
-                Constraint::Percentage(50),
-            ])
-            .split(area);
+            let chunks =
+                Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)])
+                    .split(area);
 
             // Record visible height: area height minus borders (2) minus header row (1)
             self.visible_height = chunks[0].height.saturating_sub(3);

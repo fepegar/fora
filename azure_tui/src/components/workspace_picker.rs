@@ -185,14 +185,10 @@ impl ConfirmDialog {
             .border_style(Style::default().fg(Theme::WARNING))
             .style(Style::default().bg(Theme::MODAL_BG));
 
-        let chunks = Layout::vertical([
-            Constraint::Min(1),
-            Constraint::Length(1),
-        ])
-        .split(block.inner(modal));
+        let chunks =
+            Layout::vertical([Constraint::Min(1), Constraint::Length(1)]).split(block.inner(modal));
 
-        let message = Paragraph::new(self.message.as_str())
-            .style(Style::default().fg(Theme::FG));
+        let message = Paragraph::new(self.message.as_str()).style(Style::default().fg(Theme::FG));
 
         let yes_style = if self.selected_yes {
             Style::default()

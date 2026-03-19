@@ -152,11 +152,7 @@ impl ColumnPicker {
         if self.moving.is_some() {
             vec![("↑↓", "Move"), ("Enter", "Done"), ("Esc", "Done")]
         } else {
-            let mut hints = vec![
-                ("↑↓", "Navigate"),
-                ("Enter", "Reorder"),
-                ("v", "Toggle"),
-            ];
+            let mut hints = vec![("↑↓", "Navigate"), ("Enter", "Reorder"), ("v", "Toggle")];
             if self.changed {
                 hints.push(("s", "Save"));
             }
@@ -211,10 +207,7 @@ impl ColumnPicker {
                 let mut spans = Vec::new();
 
                 if is_moving {
-                    spans.push(Span::styled(
-                        "≡ ",
-                        Style::default().fg(Theme::ACCENT),
-                    ));
+                    spans.push(Span::styled("≡ ", Style::default().fg(Theme::ACCENT)));
                 } else {
                     spans.push(Span::raw("  "));
                 }
@@ -232,7 +225,9 @@ impl ColumnPicker {
             Style::default().bg(Theme::MODAL_SELECTED_BG)
         };
 
-        let list = List::new(items).block(block).highlight_style(highlight_style);
+        let list = List::new(items)
+            .block(block)
+            .highlight_style(highlight_style);
 
         frame.render_stateful_widget(list, modal, &mut self.state);
 
@@ -261,8 +256,7 @@ impl ColumnPicker {
             height: 1,
         };
         frame.render_widget(
-            Paragraph::new(Line::from(hint_spans))
-                .style(Style::default().bg(Theme::MODAL_BG)),
+            Paragraph::new(Line::from(hint_spans)).style(Style::default().bg(Theme::MODAL_BG)),
             hint_area,
         );
     }

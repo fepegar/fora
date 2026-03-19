@@ -55,11 +55,7 @@ async fn job_fetcher_task(
     mut load_more_rx: mpsc::UnboundedReceiver<usize>,
 ) {
     let jobs_client = client.jobs();
-    let mut pager = match jobs_client.list(
-        client.resource_group(),
-        client.workspace_name(),
-        None,
-    ) {
+    let mut pager = match jobs_client.list(client.resource_group(), client.workspace_name(), None) {
         Ok(p) => p,
         Err(e) => {
             let _ = action_tx.send(Action::Error(format!("Failed to list jobs: {}", e)));
@@ -83,18 +79,15 @@ async fn job_fetcher_task(
 
                     // Send batch when it reaches BATCH_SIZE
                     if batch.len() >= BATCH_SIZE {
-                        let _ =
-                            action_tx.send(Action::JobsBatchLoaded(std::mem::take(&mut batch)));
+                        let _ = action_tx.send(Action::JobsBatchLoaded(std::mem::take(&mut batch)));
                     }
                 }
                 Some(Err(e)) => {
                     // Send any partial batch before reporting error
                     if !batch.is_empty() {
-                        let _ = action_tx
-                            .send(Action::JobsBatchLoaded(std::mem::take(&mut batch)));
+                        let _ = action_tx.send(Action::JobsBatchLoaded(std::mem::take(&mut batch)));
                     }
-                    let _ =
-                        action_tx.send(Action::Error(format!("Failed to fetch jobs: {}", e)));
+                    let _ = action_tx.send(Action::Error(format!("Failed to fetch jobs: {}", e)));
                     return;
                 }
                 None => {
@@ -126,8 +119,7 @@ fn map_job_base(job: JobBase) -> Option<JobRow> {
         .as_ref()
         .and_then(|sd| sd.created_at)
         .map(|t| {
-            chrono::DateTime::from_timestamp(t.unix_timestamp(), t.nanosecond())
-                .unwrap_or_default()
+            chrono::DateTime::from_timestamp(t.unix_timestamp(), t.nanosecond()).unwrap_or_default()
         });
 
     let props = job.properties?;
@@ -269,18 +261,16 @@ pub fn refresh_visible_jobs(
         let mut updated: Vec<JobRow> = Vec::new();
         for id in &job_ids {
             match jobs_client.get(rg, ws, id, None).await {
-                Ok(response) => {
-                    match response.into_model() {
-                        Ok(job_base) => {
-                            if let Some(row) = map_job_base(job_base) {
-                                updated.push(row);
-                            }
-                        }
-                        Err(e) => {
-                            tracing::debug!("Failed to deserialize job {}: {}", id, e);
+                Ok(response) => match response.into_model() {
+                    Ok(job_base) => {
+                        if let Some(row) = map_job_base(job_base) {
+                            updated.push(row);
                         }
                     }
-                }
+                    Err(e) => {
+                        tracing::debug!("Failed to deserialize job {}: {}", id, e);
+                    }
+                },
                 Err(e) => {
                     // Job may have been deleted; skip it
                     tracing::debug!("Failed to fetch job {}: {}", id, e);

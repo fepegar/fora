@@ -3,6 +3,8 @@ use std::path::PathBuf;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct AppConfig {
+    /// Username for filtering recent jobs (must match the `mlflow.user` tag).
+    pub username: String,
     #[serde(default)]
     pub ui: UiConfig,
     #[serde(default)]
@@ -45,6 +47,8 @@ pub struct WorkspaceConfig {
     pub subscription_id: String,
     pub resource_group: String,
     pub workspace_name: String,
+    /// Azure region (e.g. "eastus2") used for the MLflow API endpoint.
+    pub region: String,
 }
 
 /// Column layout configuration for each tab.
@@ -82,6 +86,7 @@ impl AppConfig {
 
         // No config file — use defaults with no workspaces
         Ok(AppConfig {
+            username: String::new(),
             ui: UiConfig::default(),
             workspaces: Vec::new(),
             columns: ColumnsConfig::default(),
