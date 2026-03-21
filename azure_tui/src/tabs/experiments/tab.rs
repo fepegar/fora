@@ -9,9 +9,11 @@ use crate::app::Action;
 use crate::client::AzureClient;
 use crate::components::job_detail::{self, JobDetail};
 use crate::components::spinner::Spinner;
+use crate::tabs::recent_jobs::columns::default_columns as job_default_columns;
 use crate::tabs::recent_jobs::state::RecentJobRow;
 use crate::tabs::{ActionSender, Tab};
 use crate::theme::{self, Theme};
+use crate::widgets::table::ColumnDef;
 
 use super::fetch;
 use super::state::{DiscoveryState, ExperimentEntry, ExperimentListItem, ExperimentsState};
@@ -26,12 +28,22 @@ pub struct ExperimentsTab {
     client: Option<AzureClient>,
     discovery_state: DiscoveryState,
     spinner: Spinner,
+    /// Column definitions for job rows (same as Recent Jobs tab).
+    job_columns: Vec<ColumnDef<RecentJobRow>>,
 }
 
 impl ExperimentsTab {
     pub fn new(client: Option<AzureClient>) -> Self {
         let mut table_state = TableState::default();
         table_state.select(Some(0));
+
+        // Use the same columns as the Recent Jobs tab, but skip the "experiment"
+        // column since it's redundant (the experiment header is right above).
+        let job_columns: Vec<ColumnDef<RecentJobRow>> = job_default_columns()
+            .into_iter()
+            .filter(|c| c.id != "experiment")
+            .collect();
+
         Self {
             experiments: Vec::new(),
             flat_list: Vec::new(),
@@ -41,6 +53,7 @@ impl ExperimentsTab {
             client,
             discovery_state: DiscoveryState::Idle,
             spinner: Spinner::new(),
+            job_columns,
         }
     }
 
@@ -223,6 +236,30 @@ impl Tab for ExperimentsTab {
                 }
                 self.rebuild_flat_list();
             }
+            Action::RecentJobEnriched {
+                job_id,
+                compute_target,
+                job_type,
+                command,
+                environment_id,
+                description,
+                tags,
+            } => {
+                // Update enriched fields on jobs within experiments
+                for exp in &mut self.experiments {
+                    for job in &mut exp.jobs {
+                        if job.id == *job_id {
+                            job.compute_target = compute_target.clone();
+                            job.job_type = job_type.clone();
+                            job.command = command.clone();
+                            job.environment_id = environment_id.clone();
+                            job.description = description.clone();
+                            job.tags = tags.clone();
+                            job.enriched = true;
+                        }
+                    }
+                }
+            }
             _ => {}
         }
     }
@@ -313,6 +350,23 @@ impl ExperimentsTab {
             return;
         }
 
+        // Determine visible job columns for the available width
+        let visible_cols: Vec<&ColumnDef<RecentJobRow>> =
+            self.job_columns.iter().filter(|c| c.visible).collect();
+
+        // Build column widths: first column gets extra space for experiment headers
+        let widths: Vec<Constraint> = visible_cols
+            .iter()
+            .map(|col| Constraint::Min(col.min_width.max(col.default_width)))
+            .collect();
+
+        // Header row using the job column labels
+        let header_cells: Vec<Span> = visible_cols
+            .iter()
+            .map(|col| Span::styled(col.label, theme::header_style()))
+            .collect();
+        let header = Row::new(header_cells).height(1);
+
         // Build rows from flat list
         let rows: Vec<Row> = self
             .flat_list
@@ -327,50 +381,60 @@ impl ExperimentsTab {
                     } else {
                         String::new()
                     };
-                    let recent = exp
-                        .most_recent_job_time
-                        .map(|t| t.format("%Y-%m-%d %H:%M").to_string())
-                        .unwrap_or_default();
                     let job_count = if exp.expanded && !exp.jobs.is_empty() {
                         format!(" ({})", exp.jobs.len())
                     } else {
                         String::new()
                     };
-                    Row::new(vec![
-                        Span::styled(
-                            format!("{} {}{}{}", arrow, exp.name, job_count, loading),
-                            Style::default()
-                                .fg(Theme::ACCENT)
-                                .add_modifier(Modifier::BOLD),
-                        ),
-                        Span::styled(recent, Style::default().fg(Theme::DIM)),
-                    ])
-                    .style(theme::stripe_style(idx))
+                    let recent = exp
+                        .most_recent_job_time
+                        .map(|t| t.format("%Y-%m-%d %H:%M").to_string())
+                        .unwrap_or_default();
+
+                    // Experiment header: bold name in first cell, last activity in last cell
+                    let mut cells: Vec<Span> = Vec::with_capacity(visible_cols.len());
+                    for (ci, _col) in visible_cols.iter().enumerate() {
+                        if ci == 0 {
+                            cells.push(Span::styled(
+                                format!("{} {}{}{}", arrow, exp.name, job_count, loading),
+                                Style::default()
+                                    .fg(Theme::ACCENT)
+                                    .add_modifier(Modifier::BOLD),
+                            ));
+                        } else if ci == visible_cols.len() - 1 {
+                            cells.push(Span::styled(
+                                recent.clone(),
+                                Style::default().fg(Theme::DIM),
+                            ));
+                        } else {
+                            cells.push(Span::raw(""));
+                        }
+                    }
+                    Row::new(cells).style(theme::stripe_style(idx))
                 }
                 ExperimentListItem::Job(ei, ji) => {
                     let job = &self.experiments[*ei].jobs[*ji];
-                    let sym = mlflow_status_symbol(&job.status);
-                    let name = format!("  {} {} {}", sym, job.status, job.display_name);
-                    let time = job
-                        .start_time
-                        .map(|t| t.format("%Y-%m-%d %H:%M").to_string())
-                        .unwrap_or_default();
-                    Row::new(vec![
-                        Span::styled(name, mlflow_status_style(&job.status)),
-                        Span::styled(time, Style::default().fg(Theme::DIM)),
-                    ])
-                    .style(theme::stripe_style(idx))
+                    // Use the same column extractors as the Recent Jobs tab
+                    let cells: Vec<Span> = visible_cols
+                        .iter()
+                        .enumerate()
+                        .map(|(ci, col)| {
+                            let mut text = (col.extract)(job);
+                            // Indent the first column to show it's nested
+                            if ci == 0 {
+                                text = format!("  {}", text);
+                            }
+                            let style = col
+                                .style
+                                .map(|f| f(job))
+                                .unwrap_or_else(|| theme::stripe_style(idx));
+                            Span::styled(text, style)
+                        })
+                        .collect();
+                    Row::new(cells).style(theme::stripe_style(idx))
                 }
             })
             .collect();
-
-        let widths = [Constraint::Percentage(70), Constraint::Percentage(30)];
-
-        let header = Row::new(vec![
-            Span::styled("Name", theme::header_style()),
-            Span::styled("Last Activity", theme::header_style()),
-        ])
-        .height(1);
 
         let table = Table::new(rows, &widths)
             .header(header)
@@ -379,27 +443,5 @@ impl ExperimentsTab {
 
         let mut ts = self.table_state.clone();
         frame.render_stateful_widget(table, inner, &mut ts);
-    }
-}
-
-fn mlflow_status_symbol(status: &str) -> &'static str {
-    match status {
-        "FINISHED" => "✓",
-        "FAILED" => "✗",
-        "RUNNING" => "●",
-        "KILLED" => "✕",
-        "SCHEDULED" | "STARTING" => "◯",
-        _ => "?",
-    }
-}
-
-fn mlflow_status_style(status: &str) -> Style {
-    match status {
-        "FINISHED" => Style::default().fg(Theme::SUCCESS),
-        "FAILED" => Style::default().fg(Theme::ERROR),
-        "RUNNING" => Style::default().fg(Theme::RUNNING),
-        "KILLED" => Style::default().fg(Theme::DIM),
-        "SCHEDULED" | "STARTING" => Style::default().fg(Theme::WARNING),
-        _ => Style::default().fg(Theme::DIM),
     }
 }

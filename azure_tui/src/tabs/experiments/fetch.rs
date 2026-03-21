@@ -162,8 +162,14 @@ pub fn spawn_experiment_jobs_fetch(
 
         let _ = action_tx.send(Action::ExperimentJobsLoaded {
             experiment_id,
-            jobs: all_jobs,
+            jobs: all_jobs.clone(),
         });
+
+        // Enrich jobs with full details from Azure ML REST API
+        let ids: Vec<String> = all_jobs.iter().map(|r| r.id.clone()).collect();
+        if !ids.is_empty() {
+            crate::tabs::recent_jobs::fetch::enrich_jobs(client, ids, action_tx).await;
+        }
     });
 }
 

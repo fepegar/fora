@@ -146,7 +146,7 @@ fn map_run_to_row(run: &Run, exp_names: &HashMap<String, String>) -> RecentJobRo
 }
 
 /// Enriches jobs by fetching full details from the Azure ML REST API.
-async fn enrich_jobs(client: AzureClient, job_ids: Vec<String>, action_tx: ActionSender) {
+pub async fn enrich_jobs(client: AzureClient, job_ids: Vec<String>, action_tx: ActionSender) {
     use azure_ml::models::JobBaseProperties;
 
     let rg = client.resource_group().to_string();
