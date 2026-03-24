@@ -1,3 +1,4 @@
+use crate::format::format_runtime;
 use crate::theme;
 use crate::widgets::table::ColumnDef;
 
@@ -31,11 +32,11 @@ pub fn default_columns() -> Vec<ColumnDef<RecentJobRow>> {
         )
         .with_min_width(8),
         ColumnDef::new(
-            "type",
-            "Type",
-            (|r: &RecentJobRow| r.job_type.as_deref().unwrap_or("—").to_string())
+            "runtime",
+            "Runtime",
+            (|r: &RecentJobRow| format_runtime(r.start_time, r.end_time))
                 as fn(&RecentJobRow) -> String,
-            10,
+            12,
         )
         .with_min_width(6),
         ColumnDef::new(
@@ -47,6 +48,15 @@ pub fn default_columns() -> Vec<ColumnDef<RecentJobRow>> {
         )
         .with_min_width(6),
         ColumnDef::new(
+            "type",
+            "Type",
+            (|r: &RecentJobRow| r.job_type.as_deref().unwrap_or("—").to_string())
+                as fn(&RecentJobRow) -> String,
+            10,
+        )
+        .hidden()
+        .with_min_width(6),
+        ColumnDef::new(
             "started",
             "Started",
             (|r: &RecentJobRow| {
@@ -56,6 +66,7 @@ pub fn default_columns() -> Vec<ColumnDef<RecentJobRow>> {
             }) as fn(&RecentJobRow) -> String,
             18,
         )
+        .hidden()
         .with_min_width(10),
         ColumnDef::new(
             "id",

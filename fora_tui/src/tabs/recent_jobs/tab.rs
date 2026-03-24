@@ -283,6 +283,7 @@ impl Tab for RecentJobsTab {
                 let created = job
                     .start_time
                     .map(|t| t.format("%Y-%m-%d %H:%M:%S UTC").to_string());
+                let runtime = crate::format::format_runtime(job.start_time, job.end_time);
                 (
                     job.id.clone(),
                     job.display_name.clone(),
@@ -291,6 +292,7 @@ impl Tab for RecentJobsTab {
                     job.status.clone(),
                     job.compute_target.clone(),
                     created,
+                    runtime,
                     job.command.clone(),
                     job.environment_id.clone(),
                     job.description.clone(),
@@ -306,6 +308,7 @@ impl Tab for RecentJobsTab {
                 status,
                 compute_target,
                 created,
+                runtime,
                 command,
                 environment_id,
                 description,
@@ -320,6 +323,7 @@ impl Tab for RecentJobsTab {
                     status: &status,
                     compute_target: compute_target.as_deref().unwrap_or("—"),
                     created_at: created.as_deref(),
+                    runtime: Some(runtime.as_str()),
                     command: command.as_deref(),
                     environment_id: environment_id.as_deref(),
                     description: description.as_deref(),

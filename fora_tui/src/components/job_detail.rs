@@ -19,6 +19,7 @@ pub struct JobDetail<'a> {
     pub status: &'a str,
     pub compute_target: &'a str,
     pub created_at: Option<&'a str>,
+    pub runtime: Option<&'a str>,
     pub command: Option<&'a str>,
     pub environment_id: Option<&'a str>,
     pub description: Option<&'a str>,
@@ -45,6 +46,7 @@ pub fn render_job_detail(frame: &mut Frame, area: Rect, job: &JobDetail, scroll:
 
     // ── General ──────────────────
     let created = job.created_at.unwrap_or("—");
+    let runtime = job.runtime.unwrap_or("—");
     let general_fields: Vec<(&str, &str)> = vec![
         ("Job ID", job.id),
         ("Display Name", job.display_name),
@@ -52,6 +54,7 @@ pub fn render_job_detail(frame: &mut Frame, area: Rect, job: &JobDetail, scroll:
         ("Type", job.job_type),
         ("Compute", job.compute_target),
         ("Created", created),
+        ("Runtime", runtime),
     ];
     let label_w = max_label_width(&general_fields).max("Status".len());
 

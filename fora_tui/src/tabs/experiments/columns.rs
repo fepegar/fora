@@ -1,3 +1,4 @@
+use crate::format::format_runtime;
 use crate::tabs::recent_jobs::state::RecentJobRow;
 use crate::theme;
 use crate::widgets::table::ColumnDef;
@@ -24,6 +25,14 @@ pub fn job_columns() -> Vec<ColumnDef<RecentJobRow>> {
         .with_style(|r: &RecentJobRow| mlflow_status_style(&r.status))
         .with_min_width(6),
         ColumnDef::new(
+            "runtime",
+            "Runtime",
+            (|r: &RecentJobRow| format_runtime(r.start_time, r.end_time))
+                as fn(&RecentJobRow) -> String,
+            12,
+        )
+        .with_min_width(6),
+        ColumnDef::new(
             "user",
             "User",
             (|r: &RecentJobRow| r.user.as_deref().unwrap_or("—").to_string())
@@ -41,6 +50,7 @@ pub fn job_columns() -> Vec<ColumnDef<RecentJobRow>> {
             }) as fn(&RecentJobRow) -> String,
             18,
         )
+        .hidden()
         .with_min_width(10),
         ColumnDef::new(
             "id",
