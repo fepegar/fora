@@ -22,6 +22,7 @@ use crate::components::tab_bar;
 use crate::components::workspace_picker::{centered_rect, WorkspacePicker};
 use crate::config::AppConfig;
 use crate::event::{Event, EventHandler};
+use crate::experiment_cache::ExperimentDiskCache;
 use crate::tabs::compute::ComputeTab;
 use crate::tabs::experiments::ExperimentsTab;
 use crate::tabs::recent_jobs::state::RecentJobRow;
@@ -56,6 +57,9 @@ pub enum Action {
         tags: HashMap<String, String>,
     },
 
+    // Experiment cache (shared by Recent Jobs and Experiments tabs)
+    ExperimentCacheUpdated(HashMap<String, String>),
+
     // Experiments tab
     ExperimentsDiscovered(Vec<(String, String, Option<DateTime<Utc>>)>),
     ExperimentDiscoveryComplete,
@@ -88,6 +92,7 @@ pub struct App {
     action_rx: mpsc::UnboundedReceiver<Action>,
     should_quit: bool,
     active_workspace_idx: Option<usize>,
+    experiment_disk_cache: Option<ExperimentDiskCache>,
 }
 
 impl App {
@@ -108,13 +113,23 @@ impl App {
 
         let active_workspace_idx = if client.is_some() { Some(0) } else { None };
 
+        // Load experiment cache from disk for the active workspace
+        let experiment_disk_cache = config.workspaces.first().map(|ws| {
+            ExperimentDiskCache::load(&ws.subscription_id, &ws.resource_group, &ws.workspace_name)
+        });
+        let initial_exp_cache = experiment_disk_cache
+            .as_ref()
+            .map(|c| c.experiments.clone())
+            .unwrap_or_default();
+
         let tabs: Vec<Box<dyn Tab>> = vec![
             Box::new(RecentJobsTab::new(
                 client.clone(),
                 username.clone(),
                 config.columns.jobs.as_deref(),
+                initial_exp_cache.clone(),
             )),
-            Box::new(ExperimentsTab::new(client.clone())),
+            Box::new(ExperimentsTab::new(client.clone(), initial_exp_cache)),
             Box::new(ComputeTab::new(
                 client,
                 refresh_interval,
@@ -136,6 +151,7 @@ impl App {
             action_rx,
             should_quit: false,
             active_workspace_idx,
+            experiment_disk_cache,
         })
     }
 
@@ -319,6 +335,11 @@ impl App {
                     tracing::warn!("Failed to save column config: {}", e);
                 }
             }
+            Action::ExperimentCacheUpdated(cache) => {
+                if let Some(ref mut disk_cache) = self.experiment_disk_cache {
+                    disk_cache.save(cache);
+                }
+            }
             _ => {}
         }
 
@@ -334,6 +355,15 @@ impl App {
                 Ok(client) => {
                     self.active_workspace_idx = Some(idx);
 
+                    // Load experiment cache for the new workspace
+                    let disk_cache = ExperimentDiskCache::load(
+                        &ws.subscription_id,
+                        &ws.resource_group,
+                        &ws.workspace_name,
+                    );
+                    let exp_cache = disk_cache.experiments.clone();
+                    self.experiment_disk_cache = Some(disk_cache);
+
                     // Recreate tabs with new client
                     let refresh = self.config.ui.refresh_interval_secs;
                     self.tabs = vec![
@@ -341,8 +371,9 @@ impl App {
                             Some(client.clone()),
                             self.config.username.clone(),
                             self.config.columns.jobs.as_deref(),
+                            exp_cache.clone(),
                         )),
-                        Box::new(ExperimentsTab::new(Some(client.clone()))),
+                        Box::new(ExperimentsTab::new(Some(client.clone()), exp_cache)),
                         Box::new(ComputeTab::new(
                             Some(client),
                             refresh,

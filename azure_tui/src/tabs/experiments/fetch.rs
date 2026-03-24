@@ -2,9 +2,11 @@ use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
 use mlflow::SearchRunsRequest;
+use tokio_util::sync::CancellationToken;
 
 use crate::app::Action;
 use crate::client::AzureClient;
+use crate::tabs::recent_jobs::fetch::fetch_experiments_incremental;
 use crate::tabs::recent_jobs::state::RecentJobRow;
 use crate::tabs::ActionSender;
 
@@ -17,39 +19,55 @@ pub const MLFLOW_PAGE_SIZE: u32 = 1000;
 /// As runs come in, we note the first time each experiment_id appears — that's its
 /// "most recent job time" and determines sort order. We send experiment discovery
 /// events to the UI progressively.
-pub fn spawn_experiment_discovery(client: AzureClient, action_tx: ActionSender) {
+///
+/// The task checks `cancel` between pages and before sending actions,
+/// exiting early if cancellation has been requested.
+///
+/// Uses incremental experiment fetching when `known_experiments` is non-empty.
+pub fn spawn_experiment_discovery(
+    client: AzureClient,
+    action_tx: ActionSender,
+    cancel: CancellationToken,
+    known_experiments: HashMap<String, String>,
+) {
     tokio::spawn(async move {
-        // Step 1: Get all experiment IDs and names
-        let experiments = match client.mlflow().search_all_experiments().await {
-            Ok(exps) => exps,
-            Err(e) => {
-                let _ =
-                    action_tx.send(Action::Error(format!("Failed to fetch experiments: {}", e)));
-                let _ = action_tx.send(Action::ExperimentDiscoveryComplete);
-                return;
-            }
-        };
+        // Step 1: Fetch experiments (incrementally when possible)
+        let exp_names =
+            match fetch_experiments_incremental(&client, &cancel, &action_tx, known_experiments)
+                .await
+            {
+                Some(map) => map,
+                None => {
+                    if !cancel.is_cancelled() {
+                        let _ = action_tx.send(Action::ExperimentDiscoveryComplete);
+                    }
+                    return;
+                }
+            };
 
-        if experiments.is_empty() {
+        if cancel.is_cancelled() {
+            return;
+        }
+
+        if exp_names.is_empty() {
             let _ = action_tx.send(Action::ExperimentDiscoveryComplete);
             return;
         }
 
-        let exp_names: HashMap<String, String> = experiments
-            .iter()
-            .map(|e| (e.experiment_id.clone(), e.name.clone()))
-            .collect();
+        // Notify the tab of the updated experiment cache
+        let _ = action_tx.send(Action::ExperimentCacheUpdated(exp_names.clone()));
 
-        let experiment_ids: Vec<String> = experiments
-            .iter()
-            .map(|e| e.experiment_id.clone())
-            .collect();
+        let experiment_ids: Vec<String> = exp_names.keys().cloned().collect();
 
         // Step 2: Search all runs ordered by start_time DESC
         let mut page_token: Option<String> = None;
         let mut seen_experiments: HashMap<String, DateTime<Utc>> = HashMap::new();
 
         loop {
+            if cancel.is_cancelled() {
+                return;
+            }
+
             let request = SearchRunsRequest {
                 experiment_ids: experiment_ids.clone(),
                 filter: None,
@@ -61,6 +79,9 @@ pub fn spawn_experiment_discovery(client: AzureClient, action_tx: ActionSender) 
             let response = match client.mlflow().search_runs(&request).await {
                 Ok(r) => r,
                 Err(e) => {
+                    if cancel.is_cancelled() {
+                        return;
+                    }
                     let _ = action_tx.send(Action::Error(format!(
                         "Failed to search runs for experiments: {}",
                         e
@@ -68,6 +89,10 @@ pub fn spawn_experiment_discovery(client: AzureClient, action_tx: ActionSender) 
                     break;
                 }
             };
+
+            if cancel.is_cancelled() {
+                return;
+            }
 
             // Process runs: discover experiments in order
             let mut new_experiments = Vec::new();
@@ -109,7 +134,9 @@ pub fn spawn_experiment_discovery(client: AzureClient, action_tx: ActionSender) 
             }
         }
 
-        let _ = action_tx.send(Action::ExperimentDiscoveryComplete);
+        if !cancel.is_cancelled() {
+            let _ = action_tx.send(Action::ExperimentDiscoveryComplete);
+        }
     });
 }
 
@@ -119,6 +146,7 @@ pub fn spawn_experiment_jobs_fetch(
     experiment_id: String,
     experiment_name: String,
     action_tx: ActionSender,
+    cancel: CancellationToken,
 ) {
     tokio::spawn(async move {
         let exp_names: HashMap<String, String> = [(experiment_id.clone(), experiment_name)]
@@ -129,6 +157,10 @@ pub fn spawn_experiment_jobs_fetch(
         let mut page_token: Option<String> = None;
 
         loop {
+            if cancel.is_cancelled() {
+                return;
+            }
+
             let request = SearchRunsRequest {
                 experiment_ids: vec![experiment_id.clone()],
                 filter: None,
@@ -140,6 +172,9 @@ pub fn spawn_experiment_jobs_fetch(
             let response = match client.mlflow().search_runs(&request).await {
                 Ok(r) => r,
                 Err(e) => {
+                    if cancel.is_cancelled() {
+                        return;
+                    }
                     let _ = action_tx.send(Action::Error(format!(
                         "Failed to fetch jobs for experiment: {}",
                         e
@@ -160,6 +195,10 @@ pub fn spawn_experiment_jobs_fetch(
             }
         }
 
+        if cancel.is_cancelled() {
+            return;
+        }
+
         let _ = action_tx.send(Action::ExperimentJobsLoaded {
             experiment_id,
             jobs: all_jobs.clone(),
@@ -168,7 +207,7 @@ pub fn spawn_experiment_jobs_fetch(
         // Enrich jobs with full details from Azure ML REST API
         let ids: Vec<String> = all_jobs.iter().map(|r| r.id.clone()).collect();
         if !ids.is_empty() {
-            crate::tabs::recent_jobs::fetch::enrich_jobs(client, ids, action_tx).await;
+            crate::tabs::recent_jobs::fetch::enrich_jobs(client, ids, action_tx, cancel).await;
         }
     });
 }

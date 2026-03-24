@@ -59,14 +59,16 @@ impl MlflowClient {
         &self,
         max_results: Option<u32>,
         page_token: Option<&str>,
+        order_by: Option<Vec<String>>,
+        filter: Option<String>,
     ) -> Result<SearchExperimentsResponse> {
         let url = format!("{}/experiments/search", self.base_url);
 
         let body = SearchExperimentsRequest {
             max_results,
             page_token: page_token.map(|s| s.to_string()),
-            filter: None,
-            order_by: None,
+            filter,
+            order_by,
         };
 
         let token = self.get_token().await?;
@@ -97,7 +99,7 @@ impl MlflowClient {
 
         loop {
             let resp = self
-                .search_experiments(Some(1000), page_token.as_deref())
+                .search_experiments(Some(1000), page_token.as_deref(), None, None)
                 .await?;
             all.extend(resp.experiments);
 

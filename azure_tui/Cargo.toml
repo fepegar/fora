@@ -19,6 +19,7 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 dirs = { workspace = true }
 futures = { workspace = true }
+tokio-util = { workspace = true }
 async-trait = { workspace = true }
 anyhow = "1.0"
 toml = "0.8"

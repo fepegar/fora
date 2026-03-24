@@ -4,6 +4,7 @@ pub mod client;
 pub mod components;
 pub mod config;
 pub mod event;
+pub mod experiment_cache;
 pub mod tabs;
 pub mod theme;
 pub mod widgets;

@@ -1,9 +1,12 @@
+use std::collections::HashMap;
+
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::Span;
 use ratatui::widgets::{Block, Borders, Row, Table, TableState};
 use ratatui::Frame;
+use tokio_util::sync::CancellationToken;
 
 use crate::app::Action;
 use crate::client::AzureClient;
@@ -30,10 +33,13 @@ pub struct ExperimentsTab {
     spinner: Spinner,
     /// Column definitions for job rows (same as Recent Jobs tab).
     job_columns: Vec<ColumnDef<RecentJobRow>>,
+    cancel_token: CancellationToken,
+    /// Cached experiment id → name mapping, preserved across refreshes for incremental fetching.
+    experiment_cache: HashMap<String, String>,
 }
 
 impl ExperimentsTab {
-    pub fn new(client: Option<AzureClient>) -> Self {
+    pub fn new(client: Option<AzureClient>, experiment_cache: HashMap<String, String>) -> Self {
         let mut table_state = TableState::default();
         table_state.select(Some(0));
 
@@ -54,6 +60,8 @@ impl ExperimentsTab {
             discovery_state: DiscoveryState::Idle,
             spinner: Spinner::new(),
             job_columns,
+            cancel_token: CancellationToken::new(),
+            experiment_cache,
         }
     }
 
@@ -118,6 +126,7 @@ impl ExperimentsTab {
                                 exp.experiment_id.clone(),
                                 exp.name.clone(),
                                 action_tx.clone(),
+                                self.cancel_token.clone(),
                             );
                         }
                     }
@@ -134,11 +143,20 @@ impl ExperimentsTab {
         let Some(client) = self.client.clone() else {
             return;
         };
+        // Cancel any in-flight discovery and job fetch sub-tasks
+        self.cancel_token.cancel();
+        self.cancel_token = CancellationToken::new();
+
         self.discovery_state = DiscoveryState::Loading;
         self.experiments.clear();
         self.rebuild_flat_list();
 
-        fetch::spawn_experiment_discovery(client, action_tx.clone());
+        fetch::spawn_experiment_discovery(
+            client,
+            action_tx.clone(),
+            self.cancel_token.clone(),
+            self.experiment_cache.clone(),
+        );
     }
 
     fn select_next(&mut self) {
@@ -259,6 +277,9 @@ impl Tab for ExperimentsTab {
                         }
                     }
                 }
+            }
+            Action::ExperimentCacheUpdated(cache) => {
+                self.experiment_cache = cache.clone();
             }
             _ => {}
         }

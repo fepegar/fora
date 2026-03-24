@@ -1,7 +1,10 @@
+use std::collections::HashMap;
+
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::widgets::{Block, Borders};
 use ratatui::Frame;
+use tokio_util::sync::CancellationToken;
 
 use crate::app::Action;
 use crate::client::AzureClient;
@@ -29,6 +32,9 @@ pub struct RecentJobsTab {
     username: String,
     fetch_state: FetchState,
     spinner: Spinner,
+    cancel_token: CancellationToken,
+    /// Cached experiment id → name mapping, preserved across refreshes for incremental fetching.
+    experiment_cache: HashMap<String, String>,
 }
 
 impl RecentJobsTab {
@@ -36,6 +42,7 @@ impl RecentJobsTab {
         client: Option<AzureClient>,
         username: String,
         column_config: Option<&[String]>,
+        experiment_cache: HashMap<String, String>,
     ) -> Self {
         let mut columns = default_columns();
         table::apply_column_config(&mut columns, column_config);
@@ -52,6 +59,8 @@ impl RecentJobsTab {
             username,
             fetch_state: FetchState::Idle,
             spinner: Spinner::new(),
+            cancel_token: CancellationToken::new(),
+            experiment_cache,
         }
     }
 
@@ -83,12 +92,22 @@ impl RecentJobsTab {
         let Some(client) = self.client.clone() else {
             return;
         };
+        // Cancel any in-flight fetcher and its enrichment sub-tasks
+        self.cancel_token.cancel();
+        self.cancel_token = CancellationToken::new();
+
         self.fetch_state = FetchState::Loading;
         self.all_jobs.clear();
         self.filtered_jobs.clear();
         self.list_state.set_total(0);
 
-        fetch::spawn_recent_jobs_fetcher(client, self.username.clone(), action_tx.clone());
+        fetch::spawn_recent_jobs_fetcher(
+            client,
+            self.username.clone(),
+            action_tx.clone(),
+            self.cancel_token.clone(),
+            self.experiment_cache.clone(),
+        );
     }
 }
 
@@ -215,6 +234,9 @@ impl Tab for RecentJobsTab {
                         job.enriched = true;
                     }
                 }
+            }
+            Action::ExperimentCacheUpdated(cache) => {
+                self.experiment_cache = cache.clone();
             }
             _ => {}
         }
