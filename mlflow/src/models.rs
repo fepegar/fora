@@ -40,6 +40,7 @@ pub struct SearchExperimentsRequest {
 pub struct SearchExperimentsResponse {
     #[serde(default)]
     pub experiments: Vec<Experiment>,
+    #[serde(alias = "nextPageToken")]
     pub next_page_token: Option<String>,
 }
 
@@ -106,5 +107,6 @@ pub struct SearchRunsRequest {
 pub struct SearchRunsResponse {
     #[serde(default)]
     pub runs: Vec<Run>,
+    #[serde(alias = "nextPageToken")]
     pub next_page_token: Option<String>,
 }
