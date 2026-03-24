@@ -149,6 +149,8 @@ impl Tab for ComputeTab {
     fn update(&mut self, action: &Action) {
         if let Action::ComputeLoaded(compute) = action {
             self.all_compute = compute.clone();
+            self.all_compute
+                .sort_by(|a, b| b.running_nodes.unwrap_or(0).cmp(&a.running_nodes.unwrap_or(0)));
             self.list_state.set_total(self.all_compute.len());
         }
     }
