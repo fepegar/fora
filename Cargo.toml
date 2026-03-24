@@ -1,7 +1,7 @@
 [workspace]
 members = [
     "azure_ml",
-    "azure_tui",
+    "fora_tui",
     "fora_cli",
     "mlflow"
 ]

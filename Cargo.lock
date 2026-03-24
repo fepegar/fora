@@ -246,31 +246,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "azure_tui"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "azure_core",
- "azure_identity",
- "azure_ml",
- "chrono",
- "crossterm",
- "dirs",
- "futures",
- "mlflow",
- "ratatui",
- "serde",
- "serde_json",
- "thiserror",
- "tokio",
- "tokio-util",
- "toml",
- "tracing",
- "unicode-width 0.2.2",
-]
-
-[[package]]
 name = "base64"
 version = "0.21.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -808,9 +783,9 @@ dependencies = [
  "azure_identity",
  "azure_ml",
  "azure_storage_blob",
- "azure_tui",
  "blake3",
  "clap 4.5.60",
+ "fora_tui",
  "futures",
  "globset",
  "ignore",
@@ -827,6 +802,31 @@ dependencies = [
  "url",
  "uuid",
  "zip",
+]
+
+[[package]]
+name = "fora_tui"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "azure_core",
+ "azure_identity",
+ "azure_ml",
+ "chrono",
+ "crossterm",
+ "dirs",
+ "futures",
+ "mlflow",
+ "ratatui",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tokio-util",
+ "toml",
+ "tracing",
+ "unicode-width 0.2.2",
 ]
 
 [[package]]

@@ -25,7 +25,7 @@ async fn main() -> Result<()> {
             submit_to_azure(&args).await?;
         }
         None => {
-            azure_tui::run().await?;
+            fora_tui::run().await?;
         }
     }
     Ok(())
