@@ -64,6 +64,7 @@ pub enum DetailKeyResult {
 pub enum MetricsState {
     NotFetched,
     Loading,
+    LoadingPartial(Vec<MetricSeries>),
     Loaded(Vec<MetricSeries>),
     Error(String),
 }
@@ -146,32 +147,46 @@ impl DetailPane {
     /// Update metrics state from an action.
     pub fn handle_action(&mut self, action: &Action) {
         match action {
-            Action::MetricsLoaded { run_id, metrics } => {
-                let series: Vec<MetricSeries> = metrics
-                    .iter()
-                    .map(|(key, points)| {
-                        let min_x = points.iter().map(|(x, _)| *x).fold(f64::INFINITY, f64::min);
-                        let max_x = points
-                            .iter()
-                            .map(|(x, _)| *x)
-                            .fold(f64::NEG_INFINITY, f64::max);
-                        let min_y = points.iter().map(|(_, y)| *y).fold(f64::INFINITY, f64::min);
-                        let max_y = points
-                            .iter()
-                            .map(|(_, y)| *y)
-                            .fold(f64::NEG_INFINITY, f64::max);
-                        MetricSeries {
-                            key: key.clone(),
-                            points: points.clone(),
-                            min_x,
-                            max_x,
-                            min_y,
-                            max_y,
-                        }
-                    })
-                    .collect();
+            Action::MetricBatchLoaded { run_id, metric } => {
+                let (key, points) = metric;
+                let new_series = make_metric_series(key.clone(), points.clone());
+
+                let state = self
+                    .metrics_cache
+                    .remove(run_id)
+                    .unwrap_or(MetricsState::Loading);
+
+                let mut series = match state {
+                    MetricsState::LoadingPartial(existing) => existing,
+                    MetricsState::Loading => Vec::new(),
+                    other => {
+                        // Unexpected state — keep new data, don't lose it
+                        self.metrics_cache.insert(run_id.clone(), other);
+                        return;
+                    }
+                };
+
+                // Insert in sorted order by key
+                let pos = series
+                    .binary_search_by(|s| s.key.cmp(&new_series.key))
+                    .unwrap_or_else(|p| p);
+                series.insert(pos, new_series);
+
                 self.metrics_cache
-                    .insert(run_id.clone(), MetricsState::Loaded(series));
+                    .insert(run_id.clone(), MetricsState::LoadingPartial(series));
+            }
+            Action::MetricsFetchComplete { run_id } => {
+                if let Some(MetricsState::LoadingPartial(series)) =
+                    self.metrics_cache.remove(run_id)
+                {
+                    self.metrics_cache
+                        .insert(run_id.clone(), MetricsState::Loaded(series));
+                }
+                // If still Loading (0 metrics returned), mark as Loaded with empty vec
+                if let Some(MetricsState::Loading) = self.metrics_cache.get(run_id) {
+                    self.metrics_cache
+                        .insert(run_id.clone(), MetricsState::Loaded(Vec::new()));
+                }
             }
             Action::MetricsFetchFailed { run_id, error } => {
                 self.metrics_cache
@@ -274,9 +289,9 @@ impl DetailPane {
         }
 
         match self.metrics_cache.get(run_id) {
-            Some(MetricsState::Loaded(_)) | Some(MetricsState::Loading) => {
-                DetailKeyResult::Consumed
-            }
+            Some(MetricsState::Loaded(_))
+            | Some(MetricsState::Loading)
+            | Some(MetricsState::LoadingPartial(_)) => DetailKeyResult::Consumed,
             _ => {
                 self.metrics_cache
                     .insert(run_id.to_string(), MetricsState::Loading);
@@ -489,6 +504,18 @@ impl DetailPane {
                 self.metrics_total_height = 0;
                 self.metrics_visible_height = area.height;
             }
+            MetricsState::LoadingPartial(ref series) => {
+                if series.is_empty() {
+                    let msg = Paragraph::new(" Loading metrics…")
+                        .style(Style::default().fg(Theme::DIM));
+                    frame.render_widget(msg, area);
+                    self.metrics_total_height = 0;
+                    self.metrics_visible_height = area.height;
+                    return;
+                }
+
+                self.render_metric_charts(frame, area, series, true);
+            }
             MetricsState::Loaded(ref series) => {
                 if series.is_empty() {
                     let msg = Paragraph::new(" No metrics recorded for this run")
@@ -499,15 +526,23 @@ impl DetailPane {
                     return;
                 }
 
-                self.render_metric_charts(frame, area, series);
+                self.render_metric_charts(frame, area, series, false);
             }
         }
     }
 
-    fn render_metric_charts(&mut self, frame: &mut Frame, area: Rect, series: &[MetricSeries]) {
+    fn render_metric_charts(
+        &mut self,
+        frame: &mut Frame,
+        area: Rect,
+        series: &[MetricSeries],
+        still_loading: bool,
+    ) {
         // Each chart gets CHART_HEIGHT rows, with 1 row gap between them
-        let total_height: u16 =
-            (series.len() as u16) * CHART_HEIGHT + (series.len().saturating_sub(1) as u16); // gaps
+        let loading_indicator_height: u16 = if still_loading { 2 } else { 0 };
+        let total_height: u16 = (series.len() as u16) * CHART_HEIGHT
+            + (series.len().saturating_sub(1) as u16) // gaps
+            + loading_indicator_height;
         self.metrics_total_height = total_height;
         self.metrics_visible_height = area.height;
 
@@ -546,6 +581,31 @@ impl DetailPane {
             }
 
             y_offset = chart_y_end + 1; // +1 for gap
+        }
+
+        // Loading indicator for partial state
+        if still_loading {
+            let indicator_y_start = y_offset;
+            let indicator_y_end = y_offset + loading_indicator_height;
+            if indicator_y_end > scroll && indicator_y_start < scroll + area.height {
+                let visible_start = indicator_y_start.saturating_sub(scroll);
+                let visible_y = area.y + visible_start;
+                let available_height = (area.y + area.height).saturating_sub(visible_y);
+                if available_height > 0 {
+                    let indicator_area = Rect {
+                        x: area.x,
+                        y: visible_y,
+                        width: area.width,
+                        height: loading_indicator_height.min(available_height),
+                    };
+                    let msg = Paragraph::new(format!(
+                        " Loading more metrics… ({} loaded)",
+                        series.len()
+                    ))
+                    .style(Style::default().fg(Theme::DIM));
+                    frame.render_widget(msg, indicator_area);
+                }
+            }
         }
 
         // Scrollbar
@@ -623,9 +683,37 @@ impl DetailPane {
     }
 }
 
+// ── Helpers ─────────────────────────────────────────────────────────────
+
+/// Build a `MetricSeries` from a key and points.
+fn make_metric_series(key: String, points: Vec<(f64, f64)>) -> MetricSeries {
+    let min_x = points.iter().map(|(x, _)| *x).fold(f64::INFINITY, f64::min);
+    let max_x = points
+        .iter()
+        .map(|(x, _)| *x)
+        .fold(f64::NEG_INFINITY, f64::max);
+    let min_y = points.iter().map(|(_, y)| *y).fold(f64::INFINITY, f64::min);
+    let max_y = points
+        .iter()
+        .map(|(_, y)| *y)
+        .fold(f64::NEG_INFINITY, f64::max);
+    MetricSeries {
+        key,
+        points,
+        min_x,
+        max_x,
+        min_y,
+        max_y,
+    }
+}
+
 // ── Metrics fetcher ────────────────────────────────────────────────────
 
 /// Spawn a background task to fetch metric histories for a run.
+///
+/// Metrics are sent to the UI incrementally — each metric key dispatches
+/// a `MetricBatchLoaded` action as soon as its history is ready, so
+/// charts appear progressively rather than waiting for all metrics.
 pub fn spawn_metrics_fetcher(
     client: AzureClient,
     run_id: String,
@@ -634,7 +722,6 @@ pub fn spawn_metrics_fetcher(
 ) {
     tokio::spawn(async move {
         let mlflow = client.mlflow();
-        let mut all_metrics: Vec<(String, Vec<(f64, f64)>)> = Vec::new();
 
         for key in &metric_keys {
             match mlflow.get_all_metric_history(&run_id, key).await {
@@ -657,7 +744,11 @@ pub fn spawn_metrics_fetcher(
                     };
                     points
                         .sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
-                    all_metrics.push((key.clone(), points));
+
+                    let _ = action_tx.send(Action::MetricBatchLoaded {
+                        run_id: run_id.clone(),
+                        metric: (key.clone(), points),
+                    });
                 }
                 Err(e) => {
                     let _ = action_tx.send(Action::MetricsFetchFailed {
@@ -669,12 +760,8 @@ pub fn spawn_metrics_fetcher(
             }
         }
 
-        // Sort metrics alphabetically by key
-        all_metrics.sort_by(|a, b| a.0.cmp(&b.0));
-
-        let _ = action_tx.send(Action::MetricsLoaded {
+        let _ = action_tx.send(Action::MetricsFetchComplete {
             run_id,
-            metrics: all_metrics,
         });
     });
 }

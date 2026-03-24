@@ -64,9 +64,12 @@ pub enum Action {
     ComputeLoaded(Vec<ComputeRow>),
 
     // Metrics (detail pane)
-    MetricsLoaded {
+    MetricBatchLoaded {
         run_id: String,
-        metrics: Vec<(String, Vec<(f64, f64)>)>,
+        metric: (String, Vec<(f64, f64)>),
+    },
+    MetricsFetchComplete {
+        run_id: String,
     },
     MetricsFetchFailed {
         run_id: String,

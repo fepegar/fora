@@ -354,7 +354,9 @@ impl Tab for ExperimentsTab {
             Action::ExperimentCacheUpdated(cache) => {
                 self.experiment_cache = cache.clone();
             }
-            Action::MetricsLoaded { .. } | Action::MetricsFetchFailed { .. } => {
+            Action::MetricBatchLoaded { .. }
+            | Action::MetricsFetchComplete { .. }
+            | Action::MetricsFetchFailed { .. } => {
                 self.detail_pane.handle_action(action);
             }
             _ => {}
