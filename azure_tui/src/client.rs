@@ -60,4 +60,22 @@ impl AzureClient {
     pub fn workspace_name(&self) -> &str {
         &self.workspace.workspace_name
     }
+
+    /// Cancel a running job by its ID.
+    ///
+    /// The cancel API returns HTTP 202 with an empty body. The auto-generated
+    /// Poller tries to deserialize that empty body as JSON, which fails with a
+    /// serde "EOF while parsing" error. Since the HTTP request already succeeded
+    /// at that point (the pipeline validates the status code), we treat this
+    /// specific deserialization error as a successful cancellation.
+    pub async fn cancel_job(&self, job_id: &str) -> Result<()> {
+        let poller =
+            self.jobs()
+                .cancel(self.resource_group(), self.workspace_name(), job_id, None)?;
+        match poller.await {
+            Ok(_) => Ok(()),
+            Err(e) if e.to_string().contains("EOF while parsing a value") => Ok(()),
+            Err(e) => Err(e.into()),
+        }
+    }
 }

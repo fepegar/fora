@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::layout::{Constraint, Layout, Rect};
@@ -9,10 +10,11 @@ use tokio_util::sync::CancellationToken;
 use crate::app::Action;
 use crate::client::AzureClient;
 use crate::components::column_picker::{ColumnEntry, ColumnPicker};
+use crate::components::confirm_dialog::ConfirmDialog;
 use crate::components::job_detail::{self, JobDetail};
 use crate::components::search_bar::SearchBar;
 use crate::components::spinner::Spinner;
-use crate::tabs::{ActionSender, Tab};
+use crate::tabs::{is_job_cancelable, spawn_cancel_job, ActionSender, Tab};
 use crate::theme;
 use crate::widgets::table::{self, ListState};
 
@@ -35,6 +37,9 @@ pub struct RecentJobsTab {
     cancel_token: CancellationToken,
     /// Cached experiment id → name mapping, preserved across refreshes for incremental fetching.
     experiment_cache: HashMap<String, String>,
+    confirm_dialog: ConfirmDialog,
+    /// Job ID pending cancellation (set when confirm dialog is shown).
+    pending_cancel_job_id: Option<(String, String)>,
 }
 
 impl RecentJobsTab {
@@ -61,6 +66,8 @@ impl RecentJobsTab {
             spinner: Spinner::new(),
             cancel_token: CancellationToken::new(),
             experiment_cache,
+            confirm_dialog: ConfirmDialog::default(),
+            pending_cancel_job_id: None,
         }
     }
 
@@ -117,6 +124,27 @@ impl Tab for RecentJobsTab {
     }
 
     fn handle_key(&mut self, key: KeyEvent, action_tx: &ActionSender) -> bool {
+        // Confirm dialog takes priority over everything
+        if self.confirm_dialog.active {
+            if let Some(confirmed) = self.confirm_dialog.handle_key(key) {
+                if confirmed {
+                    if let Some((job_id, display_name)) = self.pending_cancel_job_id.take() {
+                        if let Some(client) = self.client.clone() {
+                            spawn_cancel_job(
+                                Arc::new(client),
+                                job_id,
+                                display_name,
+                                action_tx.clone(),
+                            );
+                        }
+                    }
+                } else {
+                    self.pending_cancel_job_id = None;
+                }
+            }
+            return true;
+        }
+
         if self.column_picker.active {
             let was_active = self.column_picker.active;
             self.column_picker.handle_key(key);
@@ -195,6 +223,18 @@ impl Tab for RecentJobsTab {
             }
             KeyCode::Char('r') => {
                 self.start_fetch(action_tx);
+                true
+            }
+            KeyCode::Char('x') => {
+                if let Some(job) = self.selected_job() {
+                    if is_job_cancelable(&job.status) {
+                        let job_id = job.id.clone();
+                        let display_name = job.display_name.clone();
+                        self.confirm_dialog
+                            .show(format!("Cancel job '{}'?", display_name));
+                        self.pending_cancel_job_id = Some((job_id, display_name));
+                    }
+                }
                 true
             }
             _ => false,
@@ -280,6 +320,7 @@ impl Tab for RecentJobsTab {
         // Overlays
         self.search.render(frame, area);
         self.column_picker.render(frame, area);
+        self.confirm_dialog.render(frame, area);
     }
 
     fn tick(&mut self, action_tx: &ActionSender) {
@@ -295,6 +336,9 @@ impl Tab for RecentJobsTab {
     }
 
     fn key_hints(&self) -> Vec<(&'static str, &'static str)> {
+        if self.confirm_dialog.active {
+            return vec![("y", "Yes"), ("n/Esc", "No"), ("←→", "Toggle")];
+        }
         if self.column_picker.active {
             return self.column_picker.key_hints();
         }
@@ -309,6 +353,12 @@ impl Tab for RecentJobsTab {
             ("c", "Columns"),
             ("r", "Refresh"),
         ];
+        if self
+            .selected_job()
+            .is_some_and(|j| is_job_cancelable(&j.status))
+        {
+            hints.push(("x", "Cancel Job"));
+        }
         if self.state.detail_open {
             hints.push(("Esc", "Close Detail"));
         }

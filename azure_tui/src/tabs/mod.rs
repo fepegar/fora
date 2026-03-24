@@ -2,15 +2,48 @@ pub mod compute;
 pub mod experiments;
 pub mod recent_jobs;
 
+use std::sync::Arc;
+
 use crossterm::event::KeyEvent;
 use ratatui::layout::Rect;
 use ratatui::Frame;
 use tokio::sync::mpsc;
 
 use crate::app::Action;
+use crate::client::AzureClient;
 
 /// Sender for dispatching actions from tabs back to the app.
 pub type ActionSender = mpsc::UnboundedSender<Action>;
+
+/// Check whether a job status indicates the job can be cancelled.
+pub fn is_job_cancelable(status: &str) -> bool {
+    matches!(
+        status.to_lowercase().as_str(),
+        "running" | "queued" | "starting" | "preparing" | "notstarted" | "provisioning"
+    )
+}
+
+/// Spawn an async task that cancels a job and sends the result back via actions.
+pub fn spawn_cancel_job(
+    client: Arc<AzureClient>,
+    job_id: String,
+    display_name: String,
+    action_tx: ActionSender,
+) {
+    tokio::spawn(async move {
+        match client.cancel_job(&job_id).await {
+            Ok(()) => {
+                let _ = action_tx.send(Action::RefreshRequested);
+            }
+            Err(e) => {
+                let _ = action_tx.send(Action::Error(format!(
+                    "Failed to cancel job '{}': {}",
+                    display_name, e
+                )));
+            }
+        }
+    });
+}
 
 /// Trait that all tabs must implement for extensibility.
 pub trait Tab {
