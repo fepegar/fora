@@ -1,9 +1,11 @@
 use std::collections::HashMap;
 
 use ratatui::layout::Rect;
-use ratatui::style::{Modifier, Style};
+use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, Paragraph, Wrap};
+use ratatui::widgets::{
+    Block, Borders, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, Wrap,
+};
 use ratatui::Frame;
 
 use crate::theme::Theme;
@@ -24,7 +26,8 @@ pub struct JobDetail<'a> {
 }
 
 /// Renders the detail pane for a selected job.
-pub fn render_job_detail(frame: &mut Frame, area: Rect, job: &JobDetail) {
+/// Returns the total content line count (for scroll management).
+pub fn render_job_detail(frame: &mut Frame, area: Rect, job: &JobDetail, scroll: u16) -> u16 {
     let block = Block::default()
         .title(format!(" {} ", job.display_name))
         .borders(Borders::ALL)
@@ -33,64 +36,211 @@ pub fn render_job_detail(frame: &mut Frame, area: Rect, job: &JobDetail) {
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
-    let mut lines = Vec::new();
+    if inner.width < 4 || inner.height < 2 {
+        return 0;
+    }
 
-    add_section(&mut lines, "General");
-    add_field(&mut lines, "Job ID", job.id);
-    add_field(&mut lines, "Display Name", job.display_name);
-    add_field(&mut lines, "Experiment", job.experiment_name);
-    add_field(&mut lines, "Type", job.job_type);
-    add_field(&mut lines, "Status", job.status);
-    add_field(&mut lines, "Compute", job.compute_target);
-    add_field(&mut lines, "Created", job.created_at.unwrap_or("—"));
+    let content_width = inner.width.saturating_sub(2); // 1 left pad + 1 right (scrollbar area)
+    let mut lines: Vec<Line> = Vec::new();
 
-    if let Some(cmd) = job.command {
+    // ── General ──────────────────
+    let created = job.created_at.unwrap_or("—");
+    let general_fields: Vec<(&str, &str)> = vec![
+        ("Job ID", job.id),
+        ("Display Name", job.display_name),
+        ("Experiment", job.experiment_name),
+        ("Type", job.job_type),
+        ("Compute", job.compute_target),
+        ("Created", created),
+    ];
+    let label_w = max_label_width(&general_fields).max("Status".len());
+
+    add_section_header(&mut lines, "General", content_width);
+    for (label, value) in &general_fields {
+        add_aligned_field(&mut lines, label, value, label_w);
+    }
+    add_status_field(&mut lines, "Status", job.status, label_w);
+
+    // ── Execution ──────────────────
+    if job.command.is_some() || job.environment_id.is_some() {
         lines.push(Line::from(""));
-        add_section(&mut lines, "Command");
-        add_field(&mut lines, "Command", cmd);
+        add_section_header(&mut lines, "Execution", content_width);
+
+        let mut exec_labels: Vec<&str> = Vec::new();
+        if job.command.is_some() {
+            exec_labels.push("Command");
+        }
+        if job.environment_id.is_some() {
+            exec_labels.push("Environment");
+        }
+        let exec_w = exec_labels.iter().map(|l| l.len()).max().unwrap_or(0);
+
+        if let Some(cmd) = job.command {
+            add_aligned_field(&mut lines, "Command", cmd, exec_w);
+        }
+        if let Some(env) = job.environment_id {
+            let short_env = extract_environment_name(env);
+            add_aligned_field(&mut lines, "Environment", &short_env, exec_w);
+        }
     }
 
-    if let Some(env) = job.environment_id {
-        add_field(&mut lines, "Environment", env);
-    }
-
+    // ── Description ──────────────────
     if let Some(desc) = job.description {
         if !desc.is_empty() {
             lines.push(Line::from(""));
-            add_section(&mut lines, "Description");
+            add_section_header(&mut lines, "Description", content_width);
             lines.push(Line::from(Span::styled(
-                desc.to_string(),
+                format!(" {}", desc),
                 Style::default().fg(Theme::FG),
             )));
         }
     }
 
+    // ── Tags ──────────────────
     if let Some(tags) = job.tags {
         if !tags.is_empty() {
             lines.push(Line::from(""));
-            add_section(&mut lines, "Tags");
-            for (k, v) in tags {
-                add_field(&mut lines, k, v);
+            add_section_header(&mut lines, "Tags", content_width);
+            let mut sorted_tags: Vec<(&String, &String)> = tags.iter().collect();
+            sorted_tags.sort_by_key(|(k, _)| k.as_str());
+            let tag_w = sorted_tags.iter().map(|(k, _)| k.len()).max().unwrap_or(0);
+            for (k, v) in &sorted_tags {
+                add_aligned_field(&mut lines, k, v, tag_w);
             }
         }
     }
 
-    let paragraph = Paragraph::new(lines).wrap(Wrap { trim: false });
-    frame.render_widget(paragraph, inner);
+    let total_lines = lines.len() as u16;
+
+    // Content area with left padding
+    let content_area = Rect {
+        x: inner.x + 1,
+        y: inner.y,
+        width: content_width,
+        height: inner.height,
+    };
+
+    let paragraph = Paragraph::new(lines)
+        .wrap(Wrap { trim: false })
+        .scroll((scroll, 0));
+    frame.render_widget(paragraph, content_area);
+
+    // Scrollbar when content overflows
+    if total_lines > inner.height {
+        let max_scroll = total_lines.saturating_sub(inner.height) as usize;
+        let mut scrollbar_state = ScrollbarState::new(max_scroll).position(scroll as usize);
+        let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
+            .begin_symbol(None)
+            .end_symbol(None);
+        frame.render_stateful_widget(scrollbar, inner, &mut scrollbar_state);
+    }
+
+    total_lines
 }
 
-fn add_section(lines: &mut Vec<Line<'_>>, title: &'static str) {
-    lines.push(Line::from(Span::styled(
-        title,
-        Style::default()
-            .fg(Theme::ACCENT)
-            .add_modifier(Modifier::BOLD),
-    )));
-}
+// ── Shared detail-pane helpers ──────────────────────────────────────────────
 
-fn add_field(lines: &mut Vec<Line<'_>>, label: &str, value: &str) {
+/// Section header: `── Title ────────────────`
+pub fn add_section_header(lines: &mut Vec<Line<'_>>, title: &str, width: u16) {
+    let prefix = "── ";
+    let title_part = format!("{} ", title);
+    let used = prefix.len() + title_part.len();
+    let remaining = (width as usize).saturating_sub(used);
+    let suffix: String = "─".repeat(remaining);
+
     lines.push(Line::from(vec![
-        Span::styled(format!("  {}: ", label), Style::default().fg(Theme::DIM)),
+        Span::styled(prefix, Style::default().fg(Theme::ACCENT)),
+        Span::styled(
+            title_part,
+            Style::default()
+                .fg(Theme::ACCENT)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(suffix, Style::default().fg(Theme::ACCENT)),
+    ]));
+}
+
+/// Field with right-aligned label: `     Label  value`
+pub fn add_aligned_field(
+    lines: &mut Vec<Line<'_>>,
+    label: &str,
+    value: &str,
+    max_label_width: usize,
+) {
+    let padded = format!("{:>width$}", label, width = max_label_width);
+    lines.push(Line::from(vec![
+        Span::styled(format!(" {} ", padded), Style::default().fg(Theme::DIM)),
         Span::styled(value.to_string(), Style::default().fg(Theme::FG)),
     ]));
+}
+
+/// Compute the max label width from a set of (label, value) pairs.
+pub fn max_label_width(fields: &[(&str, &str)]) -> usize {
+    fields.iter().map(|(l, _)| l.len()).max().unwrap_or(0)
+}
+
+/// Status field with colored symbol.
+fn add_status_field(lines: &mut Vec<Line<'_>>, label: &str, status: &str, max_label_width: usize) {
+    let padded = format!("{:>width$}", label, width = max_label_width);
+    let symbol = mlflow_status_symbol(status);
+    let color = mlflow_status_color(status);
+    lines.push(Line::from(vec![
+        Span::styled(format!(" {} ", padded), Style::default().fg(Theme::DIM)),
+        Span::styled(format!("{} {}", symbol, status), Style::default().fg(color)),
+    ]));
+}
+
+fn mlflow_status_symbol(status: &str) -> &'static str {
+    match status {
+        "FINISHED" => "✓",
+        "FAILED" => "✗",
+        "RUNNING" => "●",
+        "KILLED" => "✕",
+        "SCHEDULED" | "STARTING" => "◯",
+        _ => "?",
+    }
+}
+
+fn mlflow_status_color(status: &str) -> Color {
+    match status {
+        "FINISHED" => Theme::SUCCESS,
+        "FAILED" => Theme::ERROR,
+        "RUNNING" => Theme::RUNNING,
+        "KILLED" => Theme::DIM,
+        "SCHEDULED" | "STARTING" => Theme::WARNING,
+        _ => Theme::DIM,
+    }
+}
+
+/// Extracts a short environment name from a full ARM resource ID.
+/// Input:  `.../environments/MyEnv/versions/3`
+/// Output: `MyEnv:3`
+/// Falls back to the original string if the pattern doesn't match.
+fn extract_environment_name(env_id: &str) -> String {
+    // Look for ".../environments/<name>/versions/<ver>"
+    let parts: Vec<&str> = env_id.split('/').collect();
+    if let Some(env_idx) = parts.iter().position(|&p| p == "environments") {
+        let name = parts.get(env_idx + 1).copied().unwrap_or(env_id);
+        if let Some(ver_idx) = parts.iter().position(|&p| p == "versions") {
+            let version = parts.get(ver_idx + 1).copied().unwrap_or("latest");
+            format!("{}:{}", name, version)
+        } else {
+            name.to_string()
+        }
+    } else {
+        env_id.to_string()
+    }
+}
+
+/// Renders a scrollbar and returns the clamped scroll position.
+/// Reusable across detail panes.
+pub fn render_detail_scrollbar(frame: &mut Frame, inner: Rect, scroll: u16, total_lines: u16) {
+    if total_lines > inner.height {
+        let max_scroll = total_lines.saturating_sub(inner.height) as usize;
+        let mut scrollbar_state = ScrollbarState::new(max_scroll).position(scroll as usize);
+        let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
+            .begin_symbol(None)
+            .end_symbol(None);
+        frame.render_stateful_widget(scrollbar, inner, &mut scrollbar_state);
+    }
 }

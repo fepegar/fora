@@ -142,6 +142,7 @@ impl ExperimentsTab {
             }
             ExperimentListItem::Job(_, _) => {
                 self.state.detail_open = !self.state.detail_open;
+                self.state.detail_scroll = 0;
             }
         }
     }
@@ -218,44 +219,68 @@ impl Tab for ExperimentsTab {
             return true;
         }
 
-        match key.code {
-            KeyCode::Up | KeyCode::Char('k') => {
-                self.select_prev();
-                true
-            }
-            KeyCode::Down | KeyCode::Char('j') => {
-                self.select_next();
-                true
-            }
-            KeyCode::Enter | KeyCode::Char(' ') => {
-                self.toggle_expand(action_tx);
-                true
-            }
-            KeyCode::Esc => {
-                if self.state.detail_open {
-                    self.state.detail_open = false;
+        // When detail pane is open, arrow keys scroll it
+        if self.state.detail_open {
+            match key.code {
+                KeyCode::Up | KeyCode::Char('k') => {
+                    self.state.detail_scroll = self.state.detail_scroll.saturating_sub(1);
                     true
-                } else {
-                    false
                 }
+                KeyCode::Down | KeyCode::Char('j') => {
+                    self.state.detail_scroll = self.state.detail_scroll.saturating_add(1);
+                    true
+                }
+                KeyCode::Home => {
+                    self.state.detail_scroll = 0;
+                    true
+                }
+                KeyCode::End => {
+                    self.state.detail_scroll = self
+                        .state
+                        .detail_total_lines
+                        .saturating_sub(self.state.detail_visible_height);
+                    true
+                }
+                KeyCode::Esc => {
+                    self.state.detail_open = false;
+                    self.state.detail_scroll = 0;
+                    true
+                }
+                _ => false,
             }
-            KeyCode::Char('r') => {
-                self.start_discovery(action_tx);
-                true
-            }
-            KeyCode::Char('x') => {
-                if let Some(job) = self.selected_job() {
-                    if is_job_cancelable(&job.status) {
-                        let job_id = job.id.clone();
-                        let display_name = job.display_name.clone();
-                        self.confirm_dialog
-                            .show(format!("Cancel job '{}'?", display_name));
-                        self.pending_cancel_job_id = Some((job_id, display_name));
+        } else {
+            match key.code {
+                KeyCode::Up | KeyCode::Char('k') => {
+                    self.select_prev();
+                    true
+                }
+                KeyCode::Down | KeyCode::Char('j') => {
+                    self.select_next();
+                    true
+                }
+                KeyCode::Enter | KeyCode::Char(' ') => {
+                    self.toggle_expand(action_tx);
+                    true
+                }
+                KeyCode::Esc => false,
+                KeyCode::Char('r') => {
+                    self.start_discovery(action_tx);
+                    true
+                }
+                KeyCode::Char('x') => {
+                    if let Some(job) = self.selected_job() {
+                        if is_job_cancelable(&job.status) {
+                            let job_id = job.id.clone();
+                            let display_name = job.display_name.clone();
+                            self.confirm_dialog
+                                .show(format!("Cancel job '{}'?", display_name));
+                            self.pending_cancel_job_id = Some((job_id, display_name));
+                        }
                     }
+                    true
                 }
-                true
+                _ => false,
             }
-            _ => false,
         }
     }
 
@@ -354,7 +379,17 @@ impl Tab for ExperimentsTab {
                         Some(&job.tags)
                     },
                 };
-                job_detail::render_job_detail(frame, chunks[1], &detail);
+                let total = job_detail::render_job_detail(
+                    frame,
+                    chunks[1],
+                    &detail,
+                    self.state.detail_scroll,
+                );
+                self.state.detail_total_lines = total;
+                let detail_inner_h = chunks[1].height.saturating_sub(2);
+                self.state.detail_visible_height = detail_inner_h;
+                let max_scroll = total.saturating_sub(detail_inner_h);
+                self.state.detail_scroll = self.state.detail_scroll.min(max_scroll);
             }
         } else {
             self.render_list(frame, area);
@@ -381,6 +416,10 @@ impl Tab for ExperimentsTab {
             return vec![("y", "Yes"), ("n/Esc", "No"), ("←→", "Toggle")];
         }
 
+        if self.state.detail_open {
+            return vec![("↑↓", "Scroll"), ("Esc", "Close Detail")];
+        }
+
         let mut hints = vec![
             ("↑↓", "Navigate"),
             ("Enter", "Expand/Details"),
@@ -391,9 +430,6 @@ impl Tab for ExperimentsTab {
             .is_some_and(|j| is_job_cancelable(&j.status))
         {
             hints.push(("x", "Cancel Job"));
-        }
-        if self.state.detail_open {
-            hints.push(("Esc", "Close Detail"));
         }
         hints
     }

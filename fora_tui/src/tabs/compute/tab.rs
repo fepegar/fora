@@ -99,58 +99,85 @@ impl Tab for ComputeTab {
             return true;
         }
 
-        match key.code {
-            KeyCode::Up | KeyCode::Char('k') => {
-                self.list_state.select_prev();
-                true
-            }
-            KeyCode::Down | KeyCode::Char('j') => {
-                self.list_state.select_next();
-                true
-            }
-            KeyCode::Enter | KeyCode::Char(' ') => {
-                self.state.detail_open = !self.state.detail_open;
-                true
-            }
-            KeyCode::Esc => {
-                if self.state.detail_open {
-                    self.state.detail_open = false;
+        // When detail pane is open, arrow keys scroll it
+        if self.state.detail_open {
+            match key.code {
+                KeyCode::Up | KeyCode::Char('k') => {
+                    self.state.detail_scroll = self.state.detail_scroll.saturating_sub(1);
                     true
-                } else {
-                    false
                 }
+                KeyCode::Down | KeyCode::Char('j') => {
+                    self.state.detail_scroll = self.state.detail_scroll.saturating_add(1);
+                    true
+                }
+                KeyCode::Home => {
+                    self.state.detail_scroll = 0;
+                    true
+                }
+                KeyCode::End => {
+                    self.state.detail_scroll = self
+                        .state
+                        .detail_total_lines
+                        .saturating_sub(self.state.detail_visible_height);
+                    true
+                }
+                KeyCode::Esc => {
+                    self.state.detail_open = false;
+                    self.state.detail_scroll = 0;
+                    true
+                }
+                _ => false,
             }
-            KeyCode::Char('c') => {
-                let entries: Vec<ColumnEntry> = self
-                    .columns
-                    .iter()
-                    .map(|c| ColumnEntry {
-                        id: c.id,
-                        label: c.label,
-                        visible: c.visible,
-                    })
-                    .collect();
-                self.column_picker.open(entries);
-                true
+        } else {
+            match key.code {
+                KeyCode::Up | KeyCode::Char('k') => {
+                    self.list_state.select_prev();
+                    true
+                }
+                KeyCode::Down | KeyCode::Char('j') => {
+                    self.list_state.select_next();
+                    true
+                }
+                KeyCode::Enter | KeyCode::Char(' ') => {
+                    self.state.detail_open = true;
+                    self.state.detail_scroll = 0;
+                    true
+                }
+                KeyCode::Char('c') => {
+                    let entries: Vec<ColumnEntry> = self
+                        .columns
+                        .iter()
+                        .map(|c| ColumnEntry {
+                            id: c.id,
+                            label: c.label,
+                            visible: c.visible,
+                        })
+                        .collect();
+                    self.column_picker.open(entries);
+                    true
+                }
+                KeyCode::Char('r') => {
+                    let cache = self.cache.clone();
+                    let tx = action_tx.clone();
+                    tokio::spawn(async move {
+                        cache.invalidate().await;
+                        let _ = tx.send(Action::RefreshRequested);
+                    });
+                    true
+                }
+                _ => false,
             }
-            KeyCode::Char('r') => {
-                let cache = self.cache.clone();
-                let tx = action_tx.clone();
-                tokio::spawn(async move {
-                    cache.invalidate().await;
-                    let _ = tx.send(Action::RefreshRequested);
-                });
-                true
-            }
-            _ => false,
         }
     }
 
     fn update(&mut self, action: &Action) {
         if let Action::ComputeLoaded(compute) = action {
             self.all_compute = compute.clone();
-            self.all_compute
-                .sort_by(|a, b| b.running_nodes.unwrap_or(0).cmp(&a.running_nodes.unwrap_or(0)));
+            self.all_compute.sort_by(|a, b| {
+                b.running_nodes
+                    .unwrap_or(0)
+                    .cmp(&a.running_nodes.unwrap_or(0))
+            });
             self.list_state.set_total(self.all_compute.len());
         }
     }
@@ -164,7 +191,13 @@ impl Tab for ComputeTab {
             self.render_list(frame, chunks[0]);
 
             if let Some(compute) = self.selected_compute() {
-                render_compute_detail(frame, chunks[1], compute);
+                let total =
+                    render_compute_detail(frame, chunks[1], compute, self.state.detail_scroll);
+                self.state.detail_total_lines = total;
+                let detail_inner_h = chunks[1].height.saturating_sub(2);
+                self.state.detail_visible_height = detail_inner_h;
+                let max_scroll = total.saturating_sub(detail_inner_h);
+                self.state.detail_scroll = self.state.detail_scroll.min(max_scroll);
             }
         } else {
             self.render_list(frame, area);
@@ -208,16 +241,16 @@ impl Tab for ComputeTab {
             return self.column_picker.key_hints();
         }
 
-        let mut hints = vec![
+        if self.state.detail_open {
+            return vec![("↑↓", "Scroll"), ("Esc", "Close Detail")];
+        }
+
+        vec![
             ("↑↓", "Navigate"),
             ("Enter", "Details"),
             ("c", "Columns"),
             ("r", "Refresh"),
-        ];
-        if self.state.detail_open {
-            hints.push(("Esc", "Close Detail"));
-        }
-        hints
+        ]
     }
 }
 

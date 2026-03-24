@@ -37,6 +37,9 @@ pub struct RecentJobRow {
 #[derive(Debug, Default)]
 pub struct RecentJobsState {
     pub detail_open: bool,
+    pub detail_scroll: u16,
+    pub detail_total_lines: u16,
+    pub detail_visible_height: u16,
 }
 
 /// Tracks the state of the MLflow fetcher.

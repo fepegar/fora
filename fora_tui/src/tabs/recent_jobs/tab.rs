@@ -183,61 +183,37 @@ impl Tab for RecentJobsTab {
             return consumed;
         }
 
-        match key.code {
-            KeyCode::Up | KeyCode::Char('k') => {
-                self.list_state.select_prev();
-                true
-            }
-            KeyCode::Down | KeyCode::Char('j') => {
-                self.list_state.select_next();
-                true
-            }
-            KeyCode::Enter | KeyCode::Char(' ') => {
-                self.state.detail_open = !self.state.detail_open;
-                true
-            }
-            KeyCode::Esc => {
-                if self.state.detail_open {
-                    self.state.detail_open = false;
+        // When detail pane is open, arrow keys scroll it
+        if self.state.detail_open {
+            match key.code {
+                KeyCode::Up | KeyCode::Char('k') => {
+                    self.state.detail_scroll = self.state.detail_scroll.saturating_sub(1);
                     true
-                } else {
-                    false
                 }
-            }
-            KeyCode::Char('/') => {
-                self.search.open();
-                true
-            }
-            KeyCode::Char('c') => {
-                let entries: Vec<ColumnEntry> = self
-                    .columns
-                    .iter()
-                    .map(|c| ColumnEntry {
-                        id: c.id,
-                        label: c.label,
-                        visible: c.visible,
-                    })
-                    .collect();
-                self.column_picker.open(entries);
-                true
-            }
-            KeyCode::Char('r') => {
-                self.start_fetch(action_tx);
-                true
-            }
-            KeyCode::Char('x') => {
-                if let Some(job) = self.selected_job() {
-                    if is_job_cancelable(&job.status) {
-                        let job_id = job.id.clone();
-                        let display_name = job.display_name.clone();
-                        self.confirm_dialog
-                            .show(format!("Cancel job '{}'?", display_name));
-                        self.pending_cancel_job_id = Some((job_id, display_name));
-                    }
+                KeyCode::Down | KeyCode::Char('j') => {
+                    self.state.detail_scroll = self.state.detail_scroll.saturating_add(1);
+                    true
                 }
-                true
+                KeyCode::Home => {
+                    self.state.detail_scroll = 0;
+                    true
+                }
+                KeyCode::End => {
+                    self.state.detail_scroll = self
+                        .state
+                        .detail_total_lines
+                        .saturating_sub(self.state.detail_visible_height);
+                    true
+                }
+                KeyCode::Esc => {
+                    self.state.detail_open = false;
+                    self.state.detail_scroll = 0;
+                    true
+                }
+                _ => false,
             }
-            _ => false,
+        } else {
+            self.handle_list_key(key, action_tx)
         }
     }
 
@@ -311,7 +287,19 @@ impl Tab for RecentJobsTab {
                         Some(&job.tags)
                     },
                 };
-                job_detail::render_job_detail(frame, chunks[1], &detail);
+                let total = job_detail::render_job_detail(
+                    frame,
+                    chunks[1],
+                    &detail,
+                    self.state.detail_scroll,
+                );
+                self.state.detail_total_lines = total;
+                // Compute visible height from the detail area inner rect
+                let detail_inner_h = chunks[1].height.saturating_sub(2); // border top + bottom
+                self.state.detail_visible_height = detail_inner_h;
+                // Clamp scroll
+                let max_scroll = total.saturating_sub(detail_inner_h);
+                self.state.detail_scroll = self.state.detail_scroll.min(max_scroll);
             }
         } else {
             self.render_list(frame, area);
@@ -346,6 +334,10 @@ impl Tab for RecentJobsTab {
             return vec![("Esc", "Close"), ("Type", "Search")];
         }
 
+        if self.state.detail_open {
+            return vec![("↑↓", "Scroll"), ("Esc", "Close Detail")];
+        }
+
         let mut hints = vec![
             ("↑↓", "Navigate"),
             ("Enter", "Details"),
@@ -359,14 +351,63 @@ impl Tab for RecentJobsTab {
         {
             hints.push(("x", "Cancel Job"));
         }
-        if self.state.detail_open {
-            hints.push(("Esc", "Close Detail"));
-        }
         hints
     }
 }
 
 impl RecentJobsTab {
+    fn handle_list_key(&mut self, key: KeyEvent, action_tx: &ActionSender) -> bool {
+        match key.code {
+            KeyCode::Up | KeyCode::Char('k') => {
+                self.list_state.select_prev();
+                true
+            }
+            KeyCode::Down | KeyCode::Char('j') => {
+                self.list_state.select_next();
+                true
+            }
+            KeyCode::Enter | KeyCode::Char(' ') => {
+                self.state.detail_open = true;
+                self.state.detail_scroll = 0;
+                true
+            }
+            KeyCode::Char('/') => {
+                self.search.open();
+                true
+            }
+            KeyCode::Char('c') => {
+                let entries: Vec<ColumnEntry> = self
+                    .columns
+                    .iter()
+                    .map(|c| ColumnEntry {
+                        id: c.id,
+                        label: c.label,
+                        visible: c.visible,
+                    })
+                    .collect();
+                self.column_picker.open(entries);
+                true
+            }
+            KeyCode::Char('r') => {
+                self.start_fetch(action_tx);
+                true
+            }
+            KeyCode::Char('x') => {
+                if let Some(job) = self.selected_job() {
+                    if is_job_cancelable(&job.status) {
+                        let job_id = job.id.clone();
+                        let display_name = job.display_name.clone();
+                        self.confirm_dialog
+                            .show(format!("Cancel job '{}'?", display_name));
+                        self.pending_cancel_job_id = Some((job_id, display_name));
+                    }
+                }
+                true
+            }
+            _ => false,
+        }
+    }
+
     fn render_list(&self, frame: &mut Frame, area: Rect) {
         let status_indicator = match self.fetch_state {
             FetchState::Idle | FetchState::Loading => {

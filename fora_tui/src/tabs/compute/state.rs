@@ -24,4 +24,7 @@ pub struct ComputeRow {
 #[derive(Debug, Default)]
 pub struct ComputeState {
     pub detail_open: bool,
+    pub detail_scroll: u16,
+    pub detail_total_lines: u16,
+    pub detail_visible_height: u16,
 }
