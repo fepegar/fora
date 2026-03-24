@@ -31,15 +31,8 @@ pub struct RecentJobRow {
     pub description: Option<String>,
     pub tags: HashMap<String, String>,
     pub enriched: bool,
-}
-
-/// State for the Recent Jobs tab.
-#[derive(Debug, Default)]
-pub struct RecentJobsState {
-    pub detail_open: bool,
-    pub detail_scroll: u16,
-    pub detail_total_lines: u16,
-    pub detail_visible_height: u16,
+    /// Metric key names from the MLflow run data (for fetching history).
+    pub metric_keys: Vec<String>,
 }
 
 /// Tracks the state of the MLflow fetcher.

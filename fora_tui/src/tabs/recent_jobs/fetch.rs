@@ -230,6 +230,8 @@ fn map_run_to_row(run: &Run, exp_names: &HashMap<String, String>) -> RecentJobRo
 
     let user = run.info.user_id.clone();
 
+    let metric_keys: Vec<String> = run.data.metrics.iter().map(|m| m.key.clone()).collect();
+
     RecentJobRow {
         id: run.info.run_id.clone(),
         display_name: run_name,
@@ -246,6 +248,7 @@ fn map_run_to_row(run: &Run, exp_names: &HashMap<String, String>) -> RecentJobRo
         description: None,
         tags: HashMap::new(),
         enriched: false,
+        metric_keys,
     }
 }
 

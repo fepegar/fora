@@ -63,6 +63,16 @@ pub enum Action {
     // Compute tab
     ComputeLoaded(Vec<ComputeRow>),
 
+    // Metrics (detail pane)
+    MetricsLoaded {
+        run_id: String,
+        metrics: Vec<(String, Vec<(f64, f64)>)>,
+    },
+    MetricsFetchFailed {
+        run_id: String,
+        error: String,
+    },
+
     // Shared
     Error(String),
     RefreshRequested,

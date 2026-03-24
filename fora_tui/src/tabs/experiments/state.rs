@@ -24,15 +24,6 @@ pub enum ExperimentListItem {
     Job(usize, usize), // (experiment index, job index)
 }
 
-/// State for the Experiments tab.
-#[derive(Debug, Default)]
-pub struct ExperimentsState {
-    pub detail_open: bool,
-    pub detail_scroll: u16,
-    pub detail_total_lines: u16,
-    pub detail_visible_height: u16,
-}
-
 /// Tracks the state of experiment discovery.
 #[derive(Debug, Clone, PartialEq)]
 pub enum DiscoveryState {

@@ -238,6 +238,8 @@ fn map_run_to_row(run: &mlflow::Run, exp_names: &HashMap<String, String>) -> Rec
         .and_then(|s| s.parse::<i64>().ok())
         .and_then(DateTime::from_timestamp_millis);
 
+    let metric_keys: Vec<String> = run.data.metrics.iter().map(|m| m.key.clone()).collect();
+
     RecentJobRow {
         id: run.info.run_id.clone(),
         display_name: run_name,
@@ -254,5 +256,6 @@ fn map_run_to_row(run: &mlflow::Run, exp_names: &HashMap<String, String>) -> Rec
         description: None,
         tags: std::collections::HashMap::new(),
         enriched: false,
+        metric_keys,
     }
 }

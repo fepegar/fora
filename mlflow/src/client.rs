@@ -5,7 +5,8 @@ use azure_core::credentials::TokenCredential;
 use reqwest::Client;
 
 use crate::models::{
-    SearchExperimentsRequest, SearchExperimentsResponse, SearchRunsRequest, SearchRunsResponse,
+    GetMetricHistoryResponse, SearchExperimentsRequest, SearchExperimentsResponse,
+    SearchRunsRequest, SearchRunsResponse,
 };
 
 const MLFLOW_TOKEN_SCOPE: &str = "https://ml.azure.com/.default";
@@ -137,5 +138,71 @@ impl MlflowClient {
         resp.json::<SearchRunsResponse>()
             .await
             .context("Failed to parse runs/search response")
+    }
+
+    /// Get metric history for a single metric key on a run.
+    pub async fn get_metric_history(
+        &self,
+        run_id: &str,
+        metric_key: &str,
+        max_results: Option<u32>,
+        page_token: Option<&str>,
+    ) -> Result<GetMetricHistoryResponse> {
+        let url = format!("{}/metrics/get-history", self.base_url);
+
+        let token = self.get_token().await?;
+        let mut req = self
+            .http
+            .get(&url)
+            .bearer_auth(&token)
+            .query(&[("run_id", run_id), ("metric_key", metric_key)]);
+
+        if let Some(max) = max_results {
+            req = req.query(&[("max_results", &max.to_string())]);
+        }
+        if let Some(pt) = page_token {
+            req = req.query(&[("page_token", pt)]);
+        }
+
+        let resp = req
+            .send()
+            .await
+            .context("MLflow metrics/get-history request failed")?;
+
+        let status = resp.status();
+        if !status.is_success() {
+            let text = resp.text().await.unwrap_or_default();
+            anyhow::bail!("MLflow metrics/get-history returned {}: {}", status, text);
+        }
+
+        resp.json::<GetMetricHistoryResponse>()
+            .await
+            .context("Failed to parse metrics/get-history response")
+    }
+
+    /// Fetch all pages of metric history for a single metric key on a run.
+    pub async fn get_all_metric_history(
+        &self,
+        run_id: &str,
+        metric_key: &str,
+    ) -> Result<Vec<crate::models::Metric>> {
+        let mut all = Vec::new();
+        let mut page_token: Option<String> = None;
+
+        loop {
+            let resp = self
+                .get_metric_history(run_id, metric_key, None, page_token.as_deref())
+                .await?;
+            all.extend(resp.metrics);
+
+            match resp.next_page_token {
+                Some(token) if !token.is_empty() => {
+                    page_token = Some(token);
+                }
+                _ => break,
+            }
+        }
+
+        Ok(all)
     }
 }

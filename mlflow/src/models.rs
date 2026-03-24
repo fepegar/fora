@@ -44,6 +44,26 @@ pub struct SearchExperimentsResponse {
     pub next_page_token: Option<String>,
 }
 
+// ── Metric types ───────────────────────────────────────────────────────
+
+/// A single metric data point (key, value, timestamp, step).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Metric {
+    pub key: String,
+    pub value: f64,
+    #[serde(default)]
+    pub timestamp: i64,
+    #[serde(default)]
+    pub step: i64,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct GetMetricHistoryResponse {
+    #[serde(default)]
+    pub metrics: Vec<Metric>,
+    pub next_page_token: Option<String>,
+}
+
 // ── Run types ──────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -73,7 +93,7 @@ pub struct RunData {
     #[serde(default)]
     pub tags: Vec<KeyValue>,
     #[serde(default)]
-    pub metrics: Vec<serde_json::Value>,
+    pub metrics: Vec<Metric>,
     #[serde(default)]
     pub params: Vec<KeyValue>,
 }

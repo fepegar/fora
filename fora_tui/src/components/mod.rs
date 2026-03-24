@@ -1,5 +1,6 @@
 pub mod column_picker;
 pub mod confirm_dialog;
+pub mod detail_pane;
 pub mod help_bar;
 pub mod job_detail;
 pub mod search_bar;

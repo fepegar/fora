@@ -11,7 +11,8 @@ use crate::app::Action;
 use crate::client::AzureClient;
 use crate::components::column_picker::{ColumnEntry, ColumnPicker};
 use crate::components::confirm_dialog::ConfirmDialog;
-use crate::components::job_detail::{self, JobDetail};
+use crate::components::detail_pane::{self, DetailKeyResult, DetailPane};
+use crate::components::job_detail::JobDetail;
 use crate::components::search_bar::SearchBar;
 use crate::components::spinner::Spinner;
 use crate::tabs::{is_job_cancelable, spawn_cancel_job, ActionSender, Tab};
@@ -20,14 +21,15 @@ use crate::widgets::table::{self, ListState};
 
 use super::columns::default_columns;
 use super::fetch;
-use super::state::{FetchState, RecentJobRow, RecentJobsState};
+use super::state::{FetchState, RecentJobRow};
 
 pub struct RecentJobsTab {
     all_jobs: Vec<RecentJobRow>,
     filtered_jobs: Vec<RecentJobRow>,
     list_state: ListState,
     columns: Vec<table::ColumnDef<RecentJobRow>>,
-    state: RecentJobsState,
+    detail_open: bool,
+    detail_pane: DetailPane,
     search: SearchBar,
     column_picker: ColumnPicker,
     client: Option<AzureClient>,
@@ -57,7 +59,8 @@ impl RecentJobsTab {
             filtered_jobs: Vec::new(),
             list_state: ListState::new(),
             columns,
-            state: RecentJobsState::default(),
+            detail_open: false,
+            detail_pane: DetailPane::new(),
             search: SearchBar::default(),
             column_picker: ColumnPicker::new(),
             client,
@@ -183,34 +186,40 @@ impl Tab for RecentJobsTab {
             return consumed;
         }
 
-        // When detail pane is open, arrow keys scroll it
-        if self.state.detail_open {
-            match key.code {
-                KeyCode::Up | KeyCode::Char('k') => {
-                    self.state.detail_scroll = self.state.detail_scroll.saturating_sub(1);
-                    true
+        // When detail pane is open, delegate to DetailPane
+        if self.detail_open {
+            if let Some(job) = self.selected_job() {
+                let run_id = job.id.clone();
+                let metric_keys = job.metric_keys.clone();
+                let result = self.detail_pane.handle_key(key, &run_id, &metric_keys);
+                match result {
+                    DetailKeyResult::Consumed => true,
+                    DetailKeyResult::Close => {
+                        self.detail_open = false;
+                        self.detail_pane.reset();
+                        true
+                    }
+                    DetailKeyResult::FetchMetrics {
+                        run_id,
+                        metric_keys,
+                    } => {
+                        if let Some(client) = self.client.clone() {
+                            detail_pane::spawn_metrics_fetcher(
+                                client,
+                                run_id,
+                                metric_keys,
+                                action_tx.clone(),
+                            );
+                        }
+                        true
+                    }
+                    DetailKeyResult::Ignored => false,
                 }
-                KeyCode::Down | KeyCode::Char('j') => {
-                    self.state.detail_scroll = self.state.detail_scroll.saturating_add(1);
-                    true
-                }
-                KeyCode::Home => {
-                    self.state.detail_scroll = 0;
-                    true
-                }
-                KeyCode::End => {
-                    self.state.detail_scroll = self
-                        .state
-                        .detail_total_lines
-                        .saturating_sub(self.state.detail_visible_height);
-                    true
-                }
-                KeyCode::Esc => {
-                    self.state.detail_open = false;
-                    self.state.detail_scroll = 0;
-                    true
-                }
-                _ => false,
+            } else {
+                // No job selected but detail is open — close
+                self.detail_open = false;
+                self.detail_pane.reset();
+                true
             }
         } else {
             self.handle_list_key(key, action_tx)
@@ -254,52 +263,69 @@ impl Tab for RecentJobsTab {
             Action::ExperimentCacheUpdated(cache) => {
                 self.experiment_cache = cache.clone();
             }
+            Action::MetricsLoaded { .. } | Action::MetricsFetchFailed { .. } => {
+                self.detail_pane.handle_action(action);
+            }
             _ => {}
         }
     }
 
     fn render(&mut self, frame: &mut Frame, area: Rect) {
-        if self.state.detail_open {
+        if self.detail_open {
             let chunks =
                 Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)])
                     .split(area);
 
             self.render_list(frame, chunks[0]);
 
-            if let Some(job) = self.selected_job() {
+            // Extract job data to avoid borrow conflict with detail_pane
+            let job_data = self.selected_job().map(|job| {
                 let created = job
                     .start_time
                     .map(|t| t.format("%Y-%m-%d %H:%M:%S UTC").to_string());
+                (
+                    job.id.clone(),
+                    job.display_name.clone(),
+                    job.experiment_name.clone(),
+                    job.job_type.clone(),
+                    job.status.clone(),
+                    job.compute_target.clone(),
+                    created,
+                    job.command.clone(),
+                    job.environment_id.clone(),
+                    job.description.clone(),
+                    job.tags.clone(),
+                )
+            });
+
+            if let Some((
+                id,
+                display_name,
+                experiment_name,
+                job_type,
+                status,
+                compute_target,
+                created,
+                command,
+                environment_id,
+                description,
+                tags,
+            )) = job_data
+            {
                 let detail = JobDetail {
-                    id: &job.id,
-                    display_name: &job.display_name,
-                    experiment_name: &job.experiment_name,
-                    job_type: job.job_type.as_deref().unwrap_or("—"),
-                    status: &job.status,
-                    compute_target: job.compute_target.as_deref().unwrap_or("—"),
+                    id: &id,
+                    display_name: &display_name,
+                    experiment_name: &experiment_name,
+                    job_type: job_type.as_deref().unwrap_or("—"),
+                    status: &status,
+                    compute_target: compute_target.as_deref().unwrap_or("—"),
                     created_at: created.as_deref(),
-                    command: job.command.as_deref(),
-                    environment_id: job.environment_id.as_deref(),
-                    description: job.description.as_deref(),
-                    tags: if job.tags.is_empty() {
-                        None
-                    } else {
-                        Some(&job.tags)
-                    },
+                    command: command.as_deref(),
+                    environment_id: environment_id.as_deref(),
+                    description: description.as_deref(),
+                    tags: if tags.is_empty() { None } else { Some(&tags) },
                 };
-                let total = job_detail::render_job_detail(
-                    frame,
-                    chunks[1],
-                    &detail,
-                    self.state.detail_scroll,
-                );
-                self.state.detail_total_lines = total;
-                // Compute visible height from the detail area inner rect
-                let detail_inner_h = chunks[1].height.saturating_sub(2); // border top + bottom
-                self.state.detail_visible_height = detail_inner_h;
-                // Clamp scroll
-                let max_scroll = total.saturating_sub(detail_inner_h);
-                self.state.detail_scroll = self.state.detail_scroll.min(max_scroll);
+                self.detail_pane.render(frame, chunks[1], &detail, &id);
             }
         } else {
             self.render_list(frame, area);
@@ -334,8 +360,8 @@ impl Tab for RecentJobsTab {
             return vec![("Esc", "Close"), ("Type", "Search")];
         }
 
-        if self.state.detail_open {
-            return vec![("↑↓", "Scroll"), ("Esc", "Close Detail")];
+        if self.detail_open {
+            return vec![("←→", "Tab"), ("↑↓", "Scroll"), ("Esc", "Close Detail")];
         }
 
         let mut hints = vec![
@@ -367,8 +393,8 @@ impl RecentJobsTab {
                 true
             }
             KeyCode::Enter | KeyCode::Char(' ') => {
-                self.state.detail_open = true;
-                self.state.detail_scroll = 0;
+                self.detail_open = true;
+                self.detail_pane.reset();
                 true
             }
             KeyCode::Char('/') => {
