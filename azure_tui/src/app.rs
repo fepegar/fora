@@ -36,14 +36,6 @@ use std::collections::HashMap;
 /// Actions dispatched by tabs and components back to the app.
 #[derive(Debug, Clone)]
 pub enum Action {
-    // Legacy Jobs tab (kept for compilation; tab no longer shown)
-    JobsBatchLoaded(Vec<crate::tabs::jobs::state::JobRow>),
-    JobsFetchPaused,
-    JobsFetchComplete,
-    JobsUpdated(Vec<crate::tabs::jobs::state::JobRow>),
-    JobsNewPrepended(Vec<crate::tabs::jobs::state::JobRow>),
-    JobCancelled(String),
-
     // Recent Jobs tab
     RecentJobsBatchLoaded(Vec<RecentJobRow>),
     RecentJobsFetchComplete,
@@ -323,7 +315,7 @@ impl App {
             }
             Action::SaveColumnConfig { tab, columns } => {
                 match tab.as_str() {
-                    "recent_jobs" | "jobs" => {
+                    "recent_jobs" => {
                         self.config.columns.jobs = Some(columns.clone());
                     }
                     "compute" => {

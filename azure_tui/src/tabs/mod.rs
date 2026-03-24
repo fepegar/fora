@@ -1,6 +1,5 @@
 pub mod compute;
 pub mod experiments;
-pub mod jobs;
 pub mod recent_jobs;
 
 use crossterm::event::KeyEvent;
