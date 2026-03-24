@@ -639,8 +639,22 @@ pub fn spawn_metrics_fetcher(
         for key in &metric_keys {
             match mlflow.get_all_metric_history(&run_id, key).await {
                 Ok(history) => {
-                    let mut points: Vec<(f64, f64)> =
-                        history.iter().map(|m| (m.step as f64, m.value)).collect();
+                    // Skip data points with no value (e.g. registration entries)
+                    let valid: Vec<_> = history.iter().filter(|m| m.value.is_some()).collect();
+                    // Use step as x-axis; if all steps are 0 (absent), fall back to index
+                    let all_zero_step = valid.iter().all(|m| m.step == 0);
+                    let mut points: Vec<(f64, f64)> = if all_zero_step {
+                        valid
+                            .iter()
+                            .enumerate()
+                            .map(|(i, m)| (i as f64, m.value.unwrap()))
+                            .collect()
+                    } else {
+                        valid
+                            .iter()
+                            .map(|m| (m.step as f64, m.value.unwrap()))
+                            .collect()
+                    };
                     points
                         .sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
                     all_metrics.push((key.clone(), points));

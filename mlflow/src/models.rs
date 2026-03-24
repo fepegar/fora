@@ -47,14 +47,25 @@ pub struct SearchExperimentsResponse {
 // ── Metric types ───────────────────────────────────────────────────────
 
 /// A single metric data point (key, value, timestamp, step).
+/// Used by the `get-history` endpoint. Fields use flexible deserializers
+/// because Azure ML's MLflow proxy returns numeric values as JSON strings.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Metric {
     pub key: String,
-    pub value: f64,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_optional_f64")]
+    pub value: Option<f64>,
+    #[serde(default, deserialize_with = "deserialize_optional_i64")]
     pub timestamp: i64,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_optional_i64")]
     pub step: i64,
+}
+
+/// Metric summary as returned in `RunData` from `search_runs`.
+/// Only the `key` is guaranteed; value may arrive as a string, NaN, etc.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RunMetricSummary {
+    pub key: String,
+    // All other fields are intentionally ignored — serde skips unknown fields by default.
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -62,6 +73,76 @@ pub struct GetMetricHistoryResponse {
     #[serde(default)]
     pub metrics: Vec<Metric>,
     pub next_page_token: Option<String>,
+}
+
+// ── Flexible deserializers for string-or-number JSON values ────────────
+
+fn deserialize_optional_f64<'de, D>(deserializer: D) -> Result<Option<f64>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::de;
+
+    struct OptF64Visitor;
+    impl<'de> de::Visitor<'de> for OptF64Visitor {
+        type Value = Option<f64>;
+        fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+            f.write_str("a number, numeric string, or null")
+        }
+        fn visit_f64<E: de::Error>(self, v: f64) -> Result<Option<f64>, E> {
+            Ok(Some(v))
+        }
+        fn visit_i64<E: de::Error>(self, v: i64) -> Result<Option<f64>, E> {
+            Ok(Some(v as f64))
+        }
+        fn visit_u64<E: de::Error>(self, v: u64) -> Result<Option<f64>, E> {
+            Ok(Some(v as f64))
+        }
+        fn visit_str<E: de::Error>(self, v: &str) -> Result<Option<f64>, E> {
+            v.parse::<f64>().map(Some).map_err(de::Error::custom)
+        }
+        fn visit_none<E: de::Error>(self) -> Result<Option<f64>, E> {
+            Ok(None)
+        }
+        fn visit_unit<E: de::Error>(self) -> Result<Option<f64>, E> {
+            Ok(None)
+        }
+    }
+    deserializer.deserialize_any(OptF64Visitor)
+}
+
+fn deserialize_optional_i64<'de, D>(deserializer: D) -> Result<i64, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::de;
+
+    struct OptI64Visitor;
+    impl<'de> de::Visitor<'de> for OptI64Visitor {
+        type Value = i64;
+        fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+            f.write_str("a number, numeric string, or null")
+        }
+        fn visit_i64<E: de::Error>(self, v: i64) -> Result<i64, E> {
+            Ok(v)
+        }
+        fn visit_u64<E: de::Error>(self, v: u64) -> Result<i64, E> {
+            Ok(v as i64)
+        }
+        fn visit_f64<E: de::Error>(self, v: f64) -> Result<i64, E> {
+            Ok(v as i64)
+        }
+        fn visit_str<E: de::Error>(self, v: &str) -> Result<i64, E> {
+            v.parse::<i64>().map_err(de::Error::custom)
+        }
+        fn visit_none<E: de::Error>(self) -> Result<i64, E> {
+            Ok(0)
+        }
+        fn visit_unit<E: de::Error>(self) -> Result<i64, E> {
+            Ok(0)
+        }
+    }
+    deserializer.deserialize_any(OptI64Visitor)
 }
 
 // ── Run types ──────────────────────────────────────────────────────────
@@ -93,7 +174,7 @@ pub struct RunData {
     #[serde(default)]
     pub tags: Vec<KeyValue>,
     #[serde(default)]
-    pub metrics: Vec<Metric>,
+    pub metrics: Vec<RunMetricSummary>,
     #[serde(default)]
     pub params: Vec<KeyValue>,
 }
