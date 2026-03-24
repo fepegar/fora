@@ -40,6 +40,17 @@ pub fn default_columns() -> Vec<ColumnDef<RecentJobRow>> {
         )
         .with_min_width(6),
         ColumnDef::new(
+            "started",
+            "Started",
+            (|r: &RecentJobRow| {
+                r.start_time
+                    .map(|t| t.format("%Y-%m-%d %H:%M").to_string())
+                    .unwrap_or_else(|| "—".to_string())
+            }) as fn(&RecentJobRow) -> String,
+            18,
+        )
+        .with_min_width(10),
+        ColumnDef::new(
             "compute",
             "Compute",
             (|r: &RecentJobRow| r.compute_target.as_deref().unwrap_or("—").to_string())
@@ -56,18 +67,6 @@ pub fn default_columns() -> Vec<ColumnDef<RecentJobRow>> {
         )
         .hidden()
         .with_min_width(6),
-        ColumnDef::new(
-            "started",
-            "Started",
-            (|r: &RecentJobRow| {
-                r.start_time
-                    .map(|t| t.format("%Y-%m-%d %H:%M").to_string())
-                    .unwrap_or_else(|| "—".to_string())
-            }) as fn(&RecentJobRow) -> String,
-            18,
-        )
-        .hidden()
-        .with_min_width(10),
         ColumnDef::new(
             "id",
             "Job ID",
