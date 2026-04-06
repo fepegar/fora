@@ -5,6 +5,9 @@ title: Home
 hero:
   name: Fora
   tagline: Azure ML from your terminal
+  image:
+    src: /logo.png
+    alt: Fora
   actions:
     - theme: brand
       text: Get Started

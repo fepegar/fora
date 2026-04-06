@@ -4,9 +4,25 @@ Fora does not have pre-built binaries yet, so it must be installed from source.
 
 ## Prerequisites
 
-- **Rust toolchain** — 1.70 or later ([install via rustup](https://rustup.rs/))
+- **Rust toolchain** — 1.70 or later (install via [rustup](https://rustup.rs/) or a tool manager like [mise](https://mise.jdx.dev/))
 - **Azure CLI** — installed and authenticated (`az login`)
 - Access to an Azure ML workspace
+
+## Install with mise
+
+If you use [mise](https://mise.jdx.dev/) for tool management, you can install Fora using the cargo backend:
+
+```toml
+# In your mise.toml
+[tools]
+"cargo:fora_cli" = { git = "https://github.com/samb-t/fora.git" }
+```
+
+Then run:
+
+```bash
+mise install
+```
 
 ## Install from source with Cargo
 
@@ -24,30 +40,4 @@ To verify the installation:
 
 ```bash
 fora --help
-```
-
-## Install with mise
-
-If you use [mise](https://mise.jdx.dev/) for tool management, you can install Fora using the cargo backend:
-
-```toml
-# In your mise.toml or .mise.toml
-[tools]
-"cargo:fora_cli" = { git = "https://github.com/samb-t/fora.git" }
-```
-
-Then run:
-
-```bash
-mise install
-```
-
-## Updating
-
-To update to the latest version, pull the latest source and reinstall:
-
-```bash
-cd fora
-git pull
-cargo install --path fora_cli
 ```
