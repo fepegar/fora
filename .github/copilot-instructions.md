@@ -75,3 +75,4 @@ Supporting modules:
 - **Configuration**: TOML files loaded from `./fora.toml` (local) or `~/.config/fora.toml` (global). Workspaces are configured with `name`, `subscription_id`, `resource_group`, `workspace_name`, and `region` (used for the MLflow API endpoint). Logging controlled via `RUST_LOG` env var.
 - **New tabs**: Implement the `Tab` trait, add to the tab list in `app.rs`, and define an `Action` variant for data events.
 - **`example/` directory**: A sample Python project for testing `fora submit`. Uses `uv` as the package manager with a Dockerfile template.
+- **Documentation**: When making changes to CLI commands, configuration options, or user-facing behaviour, update the corresponding VitePress docs in `docs/`. Key pages: `docs/setup.md` (config reference), `docs/cli/submit.md` (CLI flags), `docs/cli/index.md` (CLI overview), `docs/example.md` (submission walkthrough).

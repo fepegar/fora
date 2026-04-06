@@ -1,0 +1,9 @@
+[tools]
+bun = "latest"
+
+[settings]
+lockfile = true
+
+[tasks]
+dev = "bun run docs:dev"
+build = "bun run docs:build"
