@@ -35,3 +35,5 @@ globset = "0.4.18"
 blake3 = "1.8.3"
 async-trait.workspace = true
 names = "0.14.0"
+cliclack = "0.5.2"
+toml = "1.1.2"

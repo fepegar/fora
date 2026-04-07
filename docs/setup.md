@@ -2,6 +2,16 @@
 
 Fora is configured via a TOML file. You must set up at least one workspace before using the TUI or submitting jobs.
 
+## Quick start
+
+The easiest way to create a config file is to run the interactive setup wizard:
+
+```bash
+fora init
+```
+
+This will discover your Azure subscriptions, resource groups, and ML workspaces, then generate a config file. If you run `fora` without a config file, the wizard starts automatically.
+
 ## Config file location
 
 Fora looks for configuration in two places, in order of priority:
@@ -19,15 +29,13 @@ Fora authenticates with Azure via the Azure CLI. Make sure you are logged in bef
 az login
 ```
 
+Your display name is fetched automatically from Microsoft Graph when the TUI starts, so there is no need to configure it manually.
+
 ## Config file format
 
 Here is a complete example configuration:
 
 ```toml
-# Your Azure ML username — used to filter "My Recent Jobs" in the TUI.
-# Must match the mlflow.user tag on your jobs.
-username = "your-username"
-
 [ui]
 # Show the keyboard shortcut help bar at the bottom of the TUI.
 show_help_bar = true
@@ -58,12 +66,6 @@ compute = ["name", "type", "state", "vm_size"]
 ```
 
 ## Fields reference
-
-### Top-level
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `username` | string | Yes | Your username for filtering recent jobs. Must match the `mlflow.user` tag. |
 
 ### `[ui]`
 
@@ -98,8 +100,6 @@ Column configuration can also be changed interactively from within the TUI using
 The smallest useful config file:
 
 ```toml
-username = "your-username"
-
 [[workspaces]]
 name = "my-workspace"
 subscription_id = "00000000-0000-0000-0000-000000000000"

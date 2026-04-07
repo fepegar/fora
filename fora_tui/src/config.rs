@@ -3,13 +3,11 @@ use std::path::PathBuf;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct AppConfig {
-    /// Username for filtering recent jobs (must match the `mlflow.user` tag).
-    pub username: String,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "UiConfig::is_default")]
     pub ui: UiConfig,
     #[serde(default)]
     pub workspaces: Vec<WorkspaceConfig>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "ColumnsConfig::is_empty")]
     pub columns: ColumnsConfig,
     /// Path this config was loaded from (not serialized).
     #[serde(skip)]
@@ -30,6 +28,13 @@ impl Default for UiConfig {
             show_help_bar: default_show_help_bar(),
             refresh_interval_secs: default_refresh_interval(),
         }
+    }
+}
+
+impl UiConfig {
+    fn is_default(&self) -> bool {
+        self.show_help_bar == default_show_help_bar()
+            && self.refresh_interval_secs == default_refresh_interval()
     }
 }
 
@@ -54,9 +59,18 @@ pub struct WorkspaceConfig {
 /// Column layout configuration for each tab.
 /// Listed columns are visible in that order; unlisted columns are hidden.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[serde(default)]
 pub struct ColumnsConfig {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub jobs: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub compute: Option<Vec<String>>,
+}
+
+impl ColumnsConfig {
+    fn is_empty(&self) -> bool {
+        self.jobs.is_none() && self.compute.is_none()
+    }
 }
 
 fn config_path() -> Option<std::path::PathBuf> {
@@ -86,7 +100,6 @@ impl AppConfig {
 
         // No config file — use defaults with no workspaces
         Ok(AppConfig {
-            username: String::new(),
             ui: UiConfig::default(),
             workspaces: Vec::new(),
             columns: ColumnsConfig::default(),

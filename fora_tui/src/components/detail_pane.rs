@@ -506,8 +506,8 @@ impl DetailPane {
             }
             MetricsState::LoadingPartial(ref series) => {
                 if series.is_empty() {
-                    let msg = Paragraph::new(" Loading metrics…")
-                        .style(Style::default().fg(Theme::DIM));
+                    let msg =
+                        Paragraph::new(" Loading metrics…").style(Style::default().fg(Theme::DIM));
                     frame.render_widget(msg, area);
                     self.metrics_total_height = 0;
                     self.metrics_visible_height = area.height;
@@ -598,11 +598,9 @@ impl DetailPane {
                         width: area.width,
                         height: loading_indicator_height.min(available_height),
                     };
-                    let msg = Paragraph::new(format!(
-                        " Loading more metrics… ({} loaded)",
-                        series.len()
-                    ))
-                    .style(Style::default().fg(Theme::DIM));
+                    let msg =
+                        Paragraph::new(format!(" Loading more metrics… ({} loaded)", series.len()))
+                            .style(Style::default().fg(Theme::DIM));
                     frame.render_widget(msg, indicator_area);
                 }
             }
@@ -760,9 +758,7 @@ pub fn spawn_metrics_fetcher(
             }
         }
 
-        let _ = action_tx.send(Action::MetricsFetchComplete {
-            run_id,
-        });
+        let _ = action_tx.send(Action::MetricsFetchComplete { run_id });
     });
 }
 

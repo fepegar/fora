@@ -17,7 +17,10 @@ pub struct Cli {
 
 #[derive(Subcommand, Debug)]
 pub enum Command {
+    /// Submit a job to Azure ML.
     Submit(SubmitArgs),
+    /// Interactively set up a Fora configuration file.
+    Init,
 }
 
 #[derive(Args, Debug)]

@@ -87,6 +87,7 @@ pub enum Action {
 
 pub struct App {
     config: AppConfig,
+    username: String,
     tabs: Vec<Box<dyn Tab>>,
     active_tab: usize,
     workspace_picker: WorkspacePicker,
@@ -101,13 +102,12 @@ pub struct App {
 }
 
 impl App {
-    pub async fn new(config: AppConfig) -> Result<Self> {
+    pub async fn new(config: AppConfig, username: String) -> Result<Self> {
         let (action_tx, action_rx) = mpsc::unbounded_channel();
 
         let show_help_bar = config.ui.show_help_bar;
         let refresh_interval = config.ui.refresh_interval_secs;
-        let show_no_config = config.workspaces.is_empty() || config.username.is_empty();
-        let username = config.username.clone();
+        let show_no_config = config.workspaces.is_empty();
 
         // Try to create a client from the first workspace if available
         let client = config.workspaces.first().and_then(|ws| {
@@ -146,6 +146,7 @@ impl App {
 
         Ok(Self {
             config,
+            username,
             tabs,
             active_tab: 0,
             workspace_picker,
@@ -374,7 +375,7 @@ impl App {
                     self.tabs = vec![
                         Box::new(RecentJobsTab::new(
                             Some(client.clone()),
-                            self.config.username.clone(),
+                            self.username.clone(),
                             self.config.columns.jobs.as_deref(),
                             exp_cache.clone(),
                         )),
@@ -406,8 +407,6 @@ fn render_no_config_popup(frame: &mut ratatui::Frame, area: Rect) {
         .border_style(Style::default().fg(Theme::WARNING))
         .style(Style::default().bg(Theme::MODAL_BG));
 
-    let config_path = crate::config::AppConfig::global_config_path();
-
     let lines = vec![
         Line::from(""),
         Line::from(Span::styled(
@@ -416,51 +415,24 @@ fn render_no_config_popup(frame: &mut ratatui::Frame, area: Rect) {
         )),
         Line::from(""),
         Line::from(Span::styled(
-            "Create a config file at:",
+            "Run the following command to set up:",
+            Style::default().fg(Theme::DIM),
+        )),
+        Line::from(""),
+        Line::from(Span::styled(
+            "  fora init",
+            Style::default()
+                .fg(Theme::ACCENT)
+                .add_modifier(Modifier::BOLD),
+        )),
+        Line::from(""),
+        Line::from(Span::styled(
+            "This will discover your Azure ML workspaces",
             Style::default().fg(Theme::DIM),
         )),
         Line::from(Span::styled(
-            format!("  {}", config_path),
-            Style::default()
-                .fg(Theme::ACCENT)
-                .add_modifier(Modifier::BOLD),
-        )),
-        Line::from(Span::styled(
-            "  or ./fora.toml",
-            Style::default()
-                .fg(Theme::ACCENT)
-                .add_modifier(Modifier::BOLD),
-        )),
-        Line::from(""),
-        Line::from(Span::styled("Example:", Style::default().fg(Theme::DIM))),
-        Line::from(Span::styled(
-            "  username = \"Your Name\"",
-            Style::default().fg(Theme::FG),
-        )),
-        Line::from(""),
-        Line::from(Span::styled(
-            "  [[workspaces]]",
-            Style::default().fg(Theme::FG),
-        )),
-        Line::from(Span::styled(
-            "  name = \"my-workspace\"",
-            Style::default().fg(Theme::FG),
-        )),
-        Line::from(Span::styled(
-            "  subscription_id = \"xxxx-xxxx-xxxx\"",
-            Style::default().fg(Theme::FG),
-        )),
-        Line::from(Span::styled(
-            "  resource_group = \"my-rg\"",
-            Style::default().fg(Theme::FG),
-        )),
-        Line::from(Span::styled(
-            "  workspace_name = \"my-workspace\"",
-            Style::default().fg(Theme::FG),
-        )),
-        Line::from(Span::styled(
-            "  region = \"eastus2\"",
-            Style::default().fg(Theme::FG),
+            "and create a configuration file.",
+            Style::default().fg(Theme::DIM),
         )),
         Line::from(""),
         Line::from(Span::styled(

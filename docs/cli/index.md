@@ -17,6 +17,7 @@ fora <command> [options]
 | Command | Description |
 |---------|-------------|
 | *(none)* | Start the interactive terminal UI |
+| [`init`](./init) | Interactively set up a configuration file |
 | [`submit`](./submit) | Submit a job to Azure ML |
 
 ## Terminal UI

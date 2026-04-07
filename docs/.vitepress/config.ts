@@ -52,6 +52,7 @@ export default defineConfig({
         text: "CLI Reference",
         items: [
           { text: "Overview", link: "/cli/" },
+          { text: "fora init", link: "/cli/init" },
           { text: "fora submit", link: "/cli/submit" },
         ],
       },
