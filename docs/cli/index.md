@@ -16,35 +16,6 @@ fora <command> [options]
 
 | Command | Description |
 |---------|-------------|
-| *(none)* | Start the interactive terminal UI |
-| [`init`](./init) | Interactively set up a configuration file |
-| [`submit`](./submit) | Submit a job to Azure ML |
-
-## Terminal UI
-
-When launched without a subcommand, Fora starts an interactive TUI with the following tabs:
-
-- **Recent Jobs** — View and filter your recent ML jobs
-- **Experiments** — Browse experiments and their runs
-- **Compute** — Monitor compute cluster status
-
-The TUI supports keyboard navigation, search and filtering, a column picker for customising table layouts, and a workspace switcher for managing multiple Azure ML workspaces.
-
-### Key bindings
-
-| Key | Action |
-|-----|--------|
-| `Tab` / `Shift+Tab` | Switch between tabs |
-| `↑` / `↓` | Navigate rows |
-| `/` | Open search |
-| `c` | Open column picker |
-| `w` | Open workspace picker |
-| `Enter` | View job details |
-| `?` | Toggle help bar |
-| `q` | Quit |
-
-## Environment variables
-
-| Variable | Description |
-|----------|-------------|
-| `RUST_LOG` | Control log verbosity (e.g., `RUST_LOG=debug fora`) |
+| [`fora`](./tui) | Start the interactive terminal UI |
+| [`fora init`](./init) | Interactively set up a configuration file |
+| [`fora submit`](./submit) | Submit a job to Azure ML |

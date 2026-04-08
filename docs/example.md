@@ -1,6 +1,6 @@
 # Example: Submitting a Job
 
-This guide walks through setting up a Python project with [uv](https://docs.astral.sh/uv/) and submitting it to Azure ML using `fora submit`.
+This guide walks through setting up a Python project with [uv](https://docs.astral.sh/uv/) and submitting it to Azure ML using [`fora submit`](./cli/submit).
 
 ## 1. Create a new project
 
