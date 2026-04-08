@@ -33,33 +33,3 @@ pub(crate) struct SubscriptionListResult {
     #[serde(rename = "nextLink")]
     pub next_link: Option<String>,
 }
-
-/// Azure resource group.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-pub struct ResourceGroup {
-    pub name: String,
-    pub location: String,
-}
-
-/// Response wrapper for resource group list.
-#[derive(Debug, Deserialize)]
-pub(crate) struct ResourceGroupListResult {
-    pub value: Vec<ResourceGroup>,
-    #[serde(rename = "nextLink")]
-    pub next_link: Option<String>,
-}
-
-/// Azure Machine Learning workspace.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-pub struct MlWorkspace {
-    pub name: String,
-    pub location: String,
-}
-
-/// Response wrapper for ML workspace list.
-#[derive(Debug, Deserialize)]
-pub(crate) struct MlWorkspaceListResult {
-    pub value: Vec<MlWorkspace>,
-    #[serde(rename = "nextLink")]
-    pub next_link: Option<String>,
-}

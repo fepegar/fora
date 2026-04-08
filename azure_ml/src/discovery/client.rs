@@ -17,8 +17,7 @@ const GRAPH_ENDPOINT: &str = "https://graph.microsoft.com";
 const ARM_SCOPE: &str = "https://management.azure.com/.default";
 const GRAPH_SCOPE: &str = "https://graph.microsoft.com/.default";
 const ARM_SUBSCRIPTION_API_VERSION: &str = "2024-03-01";
-const ARM_RESOURCE_GROUP_API_VERSION: &str = "2024-03-01";
-const ML_WORKSPACE_API_VERSION: &str = "2024-10-01";
+
 
 /// Client for discovering Azure resources (subscriptions, resource groups, ML workspaces)
 /// and fetching the current user's profile from Microsoft Graph.
@@ -96,55 +95,6 @@ impl DiscoveryClient {
 
         loop {
             let result: SubscriptionListResult = self.arm_get(&url).await?;
-            all.extend(result.value);
-
-            match result.next_link {
-                Some(next_link) if !next_link.is_empty() => {
-                    url = next_link.parse()?;
-                }
-                _ => break,
-            }
-        }
-
-        Ok(all)
-    }
-
-    /// Lists resource groups in the given subscription.
-    pub async fn list_resource_groups(&self, subscription_id: &str) -> Result<Vec<ResourceGroup>> {
-        let path = format!("/subscriptions/{}/resourcegroups", subscription_id);
-        let mut all = Vec::new();
-        let mut url = self.arm_url(&path, ARM_RESOURCE_GROUP_API_VERSION)?;
-
-        loop {
-            let result: ResourceGroupListResult = self.arm_get(&url).await?;
-            all.extend(result.value);
-
-            match result.next_link {
-                Some(next_link) if !next_link.is_empty() => {
-                    url = next_link.parse()?;
-                }
-                _ => break,
-            }
-        }
-
-        Ok(all)
-    }
-
-    /// Lists Azure ML workspaces in the given subscription and resource group.
-    pub async fn list_ml_workspaces(
-        &self,
-        subscription_id: &str,
-        resource_group: &str,
-    ) -> Result<Vec<MlWorkspace>> {
-        let path = format!(
-            "/subscriptions/{}/resourceGroups/{}/providers/Microsoft.MachineLearningServices/workspaces",
-            subscription_id, resource_group
-        );
-        let mut all = Vec::new();
-        let mut url = self.arm_url(&path, ML_WORKSPACE_API_VERSION)?;
-
-        loop {
-            let result: MlWorkspaceListResult = self.arm_get(&url).await?;
             all.extend(result.value);
 
             match result.next_link {

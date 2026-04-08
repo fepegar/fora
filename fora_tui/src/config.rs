@@ -5,6 +5,9 @@ use std::path::PathBuf;
 pub struct AppConfig {
     #[serde(default, skip_serializing_if = "UiConfig::is_default")]
     pub ui: UiConfig,
+    /// Name of the workspace to show on TUI launch.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default_workspace: Option<String>,
     #[serde(default)]
     pub workspaces: Vec<WorkspaceConfig>,
     #[serde(default, skip_serializing_if = "ColumnsConfig::is_empty")]
@@ -101,6 +104,7 @@ impl AppConfig {
         // No config file — use defaults with no workspaces
         Ok(AppConfig {
             ui: UiConfig::default(),
+            default_workspace: None,
             workspaces: Vec::new(),
             columns: ColumnsConfig::default(),
             config_path: None,

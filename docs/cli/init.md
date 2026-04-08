@@ -16,8 +16,8 @@ The wizard walks you through the following steps:
 
 1. **Fetch your Azure profile** — Retrieves your display name from Microsoft Graph.
 2. **Select subscriptions** — Lists all Azure subscriptions accessible to your account and lets you pick which ones to use.
-3. **Select resource groups** — Lists resource groups within the selected subscriptions.
-4. **Select ML workspaces** — Lists Azure ML workspaces within the selected resource groups.
+3. **Select ML workspaces** — Lists all Azure ML workspaces across all resource groups in the selected subscriptions.
+4. **Select default workspace** — If more than one workspace is selected, lets you choose which workspace to show when launching the TUI.
 5. **Choose config location** — Save to `~/.config/fora.toml` (global) or `./fora.toml` (local).
 
 ## Prerequisites

@@ -109,17 +109,28 @@ impl App {
         let refresh_interval = config.ui.refresh_interval_secs;
         let show_no_config = config.workspaces.is_empty();
 
-        // Try to create a client from the first workspace if available
-        let client = config.workspaces.first().and_then(|ws| {
+        // Determine initial workspace index based on default_workspace config
+        let initial_ws_idx = config
+            .default_workspace
+            .as_ref()
+            .and_then(|name| config.workspaces.iter().position(|ws| ws.name == *name))
+            .unwrap_or(0);
+
+        // Try to create a client from the initial workspace if available
+        let client = config.workspaces.get(initial_ws_idx).and_then(|ws| {
             AzureClient::new(ws.clone())
                 .map_err(|e| tracing::warn!("Failed to create Azure client: {}", e))
                 .ok()
         });
 
-        let active_workspace_idx = if client.is_some() { Some(0) } else { None };
+        let active_workspace_idx = if client.is_some() {
+            Some(initial_ws_idx)
+        } else {
+            None
+        };
 
         // Load experiment cache from disk for the active workspace
-        let experiment_disk_cache = config.workspaces.first().map(|ws| {
+        let experiment_disk_cache = config.workspaces.get(initial_ws_idx).map(|ws| {
             ExperimentDiskCache::load(&ws.subscription_id, &ws.resource_group, &ws.workspace_name)
         });
         let initial_exp_cache = experiment_disk_cache

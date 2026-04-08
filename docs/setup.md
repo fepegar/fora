@@ -42,6 +42,9 @@ show_help_bar = true
 # Auto-refresh interval in seconds.
 refresh_interval_secs = 30
 
+# Workspace shown when launching the TUI (must match a workspace name below).
+default_workspace = "prod"
+
 # Define one or more Azure ML workspaces.
 [[workspaces]]
 name = "prod"
@@ -73,6 +76,12 @@ compute = ["name", "type", "state", "vm_size"]
 |-------|------|---------|-------------|
 | `show_help_bar` | bool | `true` | Show the keyboard shortcut help bar at the bottom of the TUI. |
 | `refresh_interval_secs` | integer | `30` | Auto-refresh interval in seconds. |
+
+### Top-level fields
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `default_workspace` | string | — | Name of the workspace to show when launching the TUI. Must match a `name` in `[[workspaces]]`. If unset, the first workspace is used. |
 
 ### `[[workspaces]]`
 

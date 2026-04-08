@@ -3,15 +3,76 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use azure_identity::AzureCliCredential;
-use azure_ml::discovery::{DiscoveryClient, MlWorkspace, ResourceGroup, Subscription};
+use azure_ml::discovery::{DiscoveryClient, Subscription};
+use azure_ml::models::Workspace;
+use azure_ml::MachineLearningServicesClient;
 use fora_tui::config::{AppConfig, WorkspaceConfig};
+use futures::StreamExt;
 
 /// Collected info about a discovered workspace, ready for config generation.
 #[derive(Clone, PartialEq, Eq)]
 struct DiscoveredWorkspace {
     subscription_id: String,
     resource_group: String,
-    workspace: MlWorkspace,
+    name: String,
+    location: String,
+}
+
+/// Parses the resource group from a full Azure resource ID.
+/// Expected format: /subscriptions/{sub}/resourceGroups/{rg}/providers/...
+fn parse_resource_group(id: &str) -> Option<String> {
+    let parts: Vec<&str> = id.split('/').collect();
+    parts
+        .iter()
+        .position(|&p| p.eq_ignore_ascii_case("resourceGroups"))
+        .and_then(|i| parts.get(i + 1))
+        .map(|s| s.to_string())
+}
+
+/// Converts a generated `Workspace` into a `DiscoveredWorkspace`.
+fn to_discovered(workspace: &Workspace, subscription_id: &str) -> Option<DiscoveredWorkspace> {
+    let id = workspace.id.as_deref()?;
+    let resource_group = parse_resource_group(id)?;
+    let name = workspace.name.clone().unwrap_or_default();
+    let location = workspace.location.clone().unwrap_or_default();
+    Some(DiscoveredWorkspace {
+        subscription_id: subscription_id.to_string(),
+        resource_group,
+        name,
+        location,
+    })
+}
+
+/// Fetches all ML workspaces for a subscription using the generated client.
+async fn fetch_workspaces_for_subscription(
+    credential: Arc<dyn azure_core::credentials::TokenCredential>,
+    subscription: &Subscription,
+) -> Result<Vec<DiscoveredWorkspace>> {
+    let ml_client = MachineLearningServicesClient::new(
+        "https://management.azure.com",
+        credential,
+        subscription.subscription_id.clone(),
+        None,
+    )
+    .map_err(|e| anyhow::anyhow!("{}", e))
+    .context("Failed to create ML client")?;
+
+    let ws_client = ml_client.get_machine_learning_services_workspaces_client();
+    let mut pager = ws_client
+        .list_by_subscription(None)
+        .map_err(|e| anyhow::anyhow!("{}", e))
+        .context("Failed to list workspaces")?;
+
+    let mut workspaces = Vec::new();
+    while let Some(result) = pager.next().await {
+        let workspace: Workspace = result
+            .map_err(|e| anyhow::anyhow!("{}", e))
+            .context("Failed to fetch workspace page")?;
+        if let Some(discovered) = to_discovered(&workspace, &subscription.subscription_id) {
+            workspaces.push(discovered);
+        }
+    }
+    Ok(workspaces)
 }
 
 /// Runs the interactive config creation wizard.
@@ -23,7 +84,7 @@ pub async fn run_init_wizard() -> Result<()> {
     )
     .context("Failed to create Azure credential. Make sure you are logged in with `az login`.")?;
 
-    let client = DiscoveryClient::new(credential);
+    let client = DiscoveryClient::new(credential.clone());
 
     // Fetch user profile
     let spinner = cliclack::spinner();
@@ -66,74 +127,23 @@ pub async fn run_init_wizard() -> Result<()> {
             .context("Subscription selection cancelled")?
     };
 
-    // Fetch resource groups for selected subscriptions
-    let spinner = cliclack::spinner();
-    spinner.start("Fetching resource groups...");
-    let mut rg_entries: Vec<(ResourceGroup, Subscription)> = Vec::new();
-    for sub in &selected_subs {
-        match client.list_resource_groups(&sub.subscription_id).await {
-            Ok(rgs) => {
-                for rg in rgs {
-                    rg_entries.push((rg, sub.clone()));
-                }
-            }
-            Err(e) => {
-                spinner.stop(format!(
-                    "Warning: failed to list resource groups for {}: {}",
-                    sub.display_name, e
-                ));
-                let spinner_new = cliclack::spinner();
-                spinner_new.start("Continuing...");
-                // Continue to next subscription
-            }
-        }
-    }
-    spinner.stop(format!("Found {} resource group(s)", rg_entries.len()));
-
-    if rg_entries.is_empty() {
-        cliclack::outro_cancel("No resource groups found in selected subscriptions.")?;
-        return Ok(());
-    }
-
-    // Select resource groups
-    let show_sub_hint = selected_subs.len() > 1;
-    let selected_rgs: Vec<(ResourceGroup, Subscription)> = {
-        let mut prompt = cliclack::multiselect("Select resource groups");
-        for (rg, sub) in &rg_entries {
-            let hint = if show_sub_hint {
-                sub.display_name.clone()
-            } else {
-                rg.location.clone()
-            };
-            prompt = prompt.item((rg.clone(), sub.clone()), &rg.name, hint);
-        }
-        prompt
-            .interact()
-            .context("Resource group selection cancelled")?
-    };
-
-    // Fetch ML workspaces for selected resource groups
+    // Fetch ML workspaces across all resource groups
     let spinner = cliclack::spinner();
     spinner.start("Fetching ML workspaces...");
+    let futures: Vec<_> = selected_subs
+        .iter()
+        .map(|sub| fetch_workspaces_for_subscription(credential.clone(), sub))
+        .collect();
+    let results = futures::future::join_all(futures).await;
+
     let mut ws_entries: Vec<DiscoveredWorkspace> = Vec::new();
-    for (rg, sub) in &selected_rgs {
-        match client
-            .list_ml_workspaces(&sub.subscription_id, &rg.name)
-            .await
-        {
-            Ok(workspaces) => {
-                for ws in workspaces {
-                    ws_entries.push(DiscoveredWorkspace {
-                        subscription_id: sub.subscription_id.clone(),
-                        resource_group: rg.name.clone(),
-                        workspace: ws,
-                    });
-                }
-            }
+    for (result, sub) in results.into_iter().zip(&selected_subs) {
+        match result {
+            Ok(workspaces) => ws_entries.extend(workspaces),
             Err(e) => {
                 cliclack::log::warning(format!(
-                    "Failed to list workspaces in {}/{}: {}",
-                    sub.display_name, rg.name, e
+                    "Failed to list workspaces in {}: {}",
+                    sub.display_name, e
                 ))?;
             }
         }
@@ -141,7 +151,7 @@ pub async fn run_init_wizard() -> Result<()> {
     spinner.stop(format!("Found {} ML workspace(s)", ws_entries.len()));
 
     if ws_entries.is_empty() {
-        cliclack::outro_cancel("No ML workspaces found in selected resource groups.")?;
+        cliclack::outro_cancel("No ML workspaces found in selected subscriptions.")?;
         return Ok(());
     }
 
@@ -149,13 +159,29 @@ pub async fn run_init_wizard() -> Result<()> {
     let selected_workspaces: Vec<DiscoveredWorkspace> = {
         let mut prompt = cliclack::multiselect("Select ML workspaces to add");
         for entry in &ws_entries {
-            let hint = format!("{} · {}", entry.workspace.location, entry.resource_group);
-            prompt = prompt.item(entry.clone(), &entry.workspace.name, hint);
+            let hint = format!("{} · {}", entry.location, entry.resource_group);
+            prompt = prompt.item(entry.clone(), &entry.name, hint);
         }
         if ws_entries.len() == 1 {
             prompt = prompt.initial_values(vec![ws_entries[0].clone()]);
         }
         prompt.interact().context("Workspace selection cancelled")?
+    };
+
+    // Select default workspace if more than one
+    let default_workspace = if selected_workspaces.len() > 1 {
+        let mut prompt = cliclack::select("Select default workspace");
+        for entry in &selected_workspaces {
+            let hint = format!("{} · {}", entry.location, entry.resource_group);
+            prompt = prompt.item(entry.name.clone(), &entry.name, hint);
+        }
+        Some(
+            prompt
+                .interact()
+                .context("Default workspace selection cancelled")?,
+        )
+    } else {
+        None
     };
 
     // Select config file location
@@ -193,16 +219,17 @@ pub async fn run_init_wizard() -> Result<()> {
     let workspace_configs: Vec<WorkspaceConfig> = selected_workspaces
         .iter()
         .map(|entry| WorkspaceConfig {
-            name: entry.workspace.name.clone(),
+            name: entry.name.clone(),
             subscription_id: entry.subscription_id.clone(),
             resource_group: entry.resource_group.clone(),
-            workspace_name: entry.workspace.name.clone(),
-            region: entry.workspace.location.clone(),
+            workspace_name: entry.name.clone(),
+            region: entry.location.clone(),
         })
         .collect();
 
     let config = AppConfig {
         ui: Default::default(),
+        default_workspace,
         workspaces: workspace_configs,
         columns: Default::default(),
         config_path: Some(config_path.clone()),
