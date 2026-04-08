@@ -39,7 +39,7 @@ async fn fetch_display_name() -> String {
 
     let client = DiscoveryClient::new(credential);
     match client.get_current_user().await {
-        Ok(profile) => profile.display_name,
+        Ok(profile) => profile.name(),
         Err(e) => {
             tracing::warn!("Failed to fetch user profile from Graph API: {}", e);
             String::new()

@@ -5,6 +5,16 @@ use serde::Deserialize;
 pub struct UserProfile {
     #[serde(rename = "displayName")]
     pub display_name: String,
+    #[serde(rename = "givenName")]
+    pub given_name: String,
+    pub surname: String,
+}
+
+impl UserProfile {
+    /// Returns the user's full name as "{givenName} {surname}".
+    pub fn name(&self) -> String {
+        format!("{} {}", self.given_name, self.surname)
+    }
 }
 
 /// Azure subscription.

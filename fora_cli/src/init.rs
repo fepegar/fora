@@ -30,7 +30,7 @@ pub async fn run_init_wizard() -> Result<()> {
     spinner.start("Fetching your Azure profile...");
     match client.get_current_user().await {
         Ok(profile) => {
-            spinner.stop(format!("Welcome, {}!", profile.display_name));
+            spinner.stop(format!("Welcome, {}!", profile.name()));
         }
         Err(e) => {
             spinner.stop(format!("Could not fetch profile: {}", e));
