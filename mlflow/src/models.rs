@@ -72,6 +72,7 @@ pub struct RunMetricSummary {
 pub struct GetMetricHistoryResponse {
     #[serde(default)]
     pub metrics: Vec<Metric>,
+    #[serde(alias = "nextPageToken")]
     pub next_page_token: Option<String>,
 }
 

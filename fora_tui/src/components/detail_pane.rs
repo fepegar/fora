@@ -724,8 +724,11 @@ pub fn spawn_metrics_fetcher(
         for key in &metric_keys {
             match mlflow.get_all_metric_history(&run_id, key).await {
                 Ok(history) => {
-                    // Skip data points with no value (e.g. registration entries)
-                    let valid: Vec<_> = history.iter().filter(|m| m.value.is_some()).collect();
+                    // Skip data points with no value, NaN, or infinite values
+                    let valid: Vec<_> = history
+                        .iter()
+                        .filter(|m| matches!(m.value, Some(v) if v.is_finite()))
+                        .collect();
                     // Use step as x-axis; if all steps are 0 (absent), fall back to index
                     let all_zero_step = valid.iter().all(|m| m.step == 0);
                     let mut points: Vec<(f64, f64)> = if all_zero_step {
@@ -743,10 +746,12 @@ pub fn spawn_metrics_fetcher(
                     points
                         .sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
 
-                    let _ = action_tx.send(Action::MetricBatchLoaded {
-                        run_id: run_id.clone(),
-                        metric: (key.clone(), points),
-                    });
+                    if !points.is_empty() {
+                        let _ = action_tx.send(Action::MetricBatchLoaded {
+                            run_id: run_id.clone(),
+                            metric: (key.clone(), points),
+                        });
+                    }
                 }
                 Err(e) => {
                     let _ = action_tx.send(Action::MetricsFetchFailed {
