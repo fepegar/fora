@@ -12,6 +12,14 @@ Fora does not have pre-built binaries yet, so it must be installed from source.
 
 If you use [mise](https://mise.jdx.dev/) for tool management, you can install Fora using the cargo backend:
 
+To install `fora` globally, run the following command
+
+```bash
+mise use -g cargo:https://github.com/samb-t/fora.git
+```
+
+Or manually add the following to your mise config:
+
 ```toml
 # In your mise.toml
 [tools]

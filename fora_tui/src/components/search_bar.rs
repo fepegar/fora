@@ -1,7 +1,7 @@
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::layout::Rect;
 use ratatui::style::Style;
-use ratatui::widgets::{Block, Borders, Paragraph};
+use ratatui::widgets::{Block, Borders, Clear, Paragraph};
 use ratatui::Frame;
 
 use crate::theme::Theme;
@@ -73,10 +73,13 @@ impl SearchBar {
             height: 3.min(area.height),
         };
 
+        frame.render_widget(Clear, search_area);
+
         let block = Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(Theme::ACCENT))
-            .title(" Search (Esc to close) ");
+            .title(" Search (Esc to close) ")
+            .style(Style::default().bg(Theme::MODAL_BG));
 
         let text = format!("/{}", &self.query);
         let paragraph = Paragraph::new(text).block(block);
