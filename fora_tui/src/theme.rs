@@ -72,6 +72,26 @@ pub fn border_style(active: bool) -> Style {
 
 // --- Status symbols and colours ---
 
+pub fn job_status_display_name(status: &JobStatus) -> &str {
+    match status {
+        JobStatus::CancelRequested => "Cancel Requested",
+        JobStatus::Canceled => "Canceled",
+        JobStatus::Completed => "Completed",
+        JobStatus::Failed => "Failed",
+        JobStatus::Finalizing => "Finalizing",
+        JobStatus::NotResponding => "Not Responding",
+        JobStatus::NotStarted => "Not Started",
+        JobStatus::Paused => "Paused",
+        JobStatus::Preparing => "Preparing",
+        JobStatus::Provisioning => "Provisioning",
+        JobStatus::Queued => "Queued",
+        JobStatus::Running => "Running",
+        JobStatus::Starting => "Starting",
+        JobStatus::Unknown => "Unknown",
+        JobStatus::UnknownValue(s) => s.as_str(),
+    }
+}
+
 pub fn job_status_symbol(status: &JobStatus) -> &'static str {
     match status {
         JobStatus::Completed => "✓",

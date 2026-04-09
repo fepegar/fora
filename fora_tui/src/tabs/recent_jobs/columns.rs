@@ -17,12 +17,13 @@ pub fn default_columns() -> Vec<ColumnDef<RecentJobRow>> {
             "status",
             "Status",
             (|r: &RecentJobRow| {
-                let sym = mlflow_status_symbol(&r.status);
-                format!("{} {}", sym, r.status)
+                let sym = theme::job_status_symbol(&r.status);
+                let name = theme::job_status_display_name(&r.status);
+                format!("{} {}", sym, name)
             }) as fn(&RecentJobRow) -> String,
             16,
         )
-        .with_style(|r: &RecentJobRow| mlflow_status_style(&r.status))
+        .with_style(|r: &RecentJobRow| theme::job_status_style(&r.status))
         .with_min_width(6),
         ColumnDef::new(
             "experiment",
@@ -76,27 +77,4 @@ pub fn default_columns() -> Vec<ColumnDef<RecentJobRow>> {
         .hidden()
         .with_min_width(8),
     ]
-}
-
-fn mlflow_status_symbol(status: &str) -> &'static str {
-    match status {
-        "FINISHED" => "✓",
-        "FAILED" => "✗",
-        "RUNNING" => "●",
-        "KILLED" => "✕",
-        "SCHEDULED" | "STARTING" => "◯",
-        _ => "?",
-    }
-}
-
-fn mlflow_status_style(status: &str) -> ratatui::style::Style {
-    use ratatui::style::Style;
-    match status {
-        "FINISHED" => Style::default().fg(theme::Theme::SUCCESS),
-        "FAILED" => Style::default().fg(theme::Theme::ERROR),
-        "RUNNING" => Style::default().fg(theme::Theme::RUNNING),
-        "KILLED" => Style::default().fg(theme::Theme::DIM),
-        "SCHEDULED" | "STARTING" => Style::default().fg(theme::Theme::WARNING),
-        _ => Style::default().fg(theme::Theme::DIM),
-    }
 }

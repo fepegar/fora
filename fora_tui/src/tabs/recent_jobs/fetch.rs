@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
-use chrono::DateTime;
+use azure_ml::models::JobStatus;
+use chrono::{DateTime, Utc};
 use mlflow::{Run, SearchRunsRequest};
 use tokio_util::sync::CancellationToken;
 
@@ -237,7 +238,7 @@ fn map_run_to_row(run: &Run, exp_names: &HashMap<String, String>) -> RecentJobRo
         display_name: run_name,
         experiment_name,
         experiment_id: run.info.experiment_id.clone(),
-        status: run.info.status.clone(),
+        status: mlflow_status_to_job_status(&run.info.status),
         start_time,
         end_time,
         user,
@@ -249,6 +250,19 @@ fn map_run_to_row(run: &Run, exp_names: &HashMap<String, String>) -> RecentJobRo
         tags: HashMap::new(),
         enriched: false,
         metric_keys,
+    }
+}
+
+/// Maps an MLflow status string to the Azure ML `JobStatus` enum.
+pub fn mlflow_status_to_job_status(status: &str) -> JobStatus {
+    match status {
+        "FINISHED" => JobStatus::Completed,
+        "FAILED" => JobStatus::Failed,
+        "RUNNING" => JobStatus::Running,
+        "KILLED" => JobStatus::Canceled,
+        "SCHEDULED" => JobStatus::Queued,
+        "STARTING" => JobStatus::Starting,
+        _ => JobStatus::Unknown,
     }
 }
 
@@ -296,7 +310,7 @@ pub async fn enrich_jobs(
                     if let Ok(job_base) = response.into_model() {
                         let job_id = job_base.name.unwrap_or_default();
                         if let Some(props) = job_base.properties {
-                            let (compute, jtype, cmd, env, desc, tags) = match props {
+                            let (compute, jtype, cmd, env, desc, tags, status) = match props {
                                 JobBaseProperties::CommandJob(cmd_job) => (
                                     extract_compute(&cmd_job.compute_id),
                                     Some("Command".to_string()),
@@ -304,6 +318,7 @@ pub async fn enrich_jobs(
                                     cmd_job.environment_id.clone(),
                                     cmd_job.description.clone(),
                                     cmd_job.tags.unwrap_or_default(),
+                                    cmd_job.status,
                                 ),
                                 JobBaseProperties::PipelineJob(pj) => (
                                     extract_compute(&pj.compute_id),
@@ -312,6 +327,7 @@ pub async fn enrich_jobs(
                                     None,
                                     pj.description.clone(),
                                     pj.tags.unwrap_or_default(),
+                                    pj.status,
                                 ),
                                 JobBaseProperties::SweepJob(sj) => (
                                     extract_compute(&sj.compute_id),
@@ -320,8 +336,9 @@ pub async fn enrich_jobs(
                                     None,
                                     sj.description.clone(),
                                     sj.tags.unwrap_or_default(),
+                                    sj.status,
                                 ),
-                                _ => (None, None, None, None, None, HashMap::new()),
+                                _ => (None, None, None, None, None, HashMap::new(), None),
                             };
                             let _ = tx.send(Action::RecentJobEnriched {
                                 job_id,
@@ -331,6 +348,8 @@ pub async fn enrich_jobs(
                                 environment_id: env,
                                 description: desc,
                                 tags,
+                                status,
+                                end_time: None,
                             });
                         }
                     }
@@ -350,4 +369,103 @@ fn extract_compute(compute_id: &Option<String>) -> Option<String> {
         .as_deref()
         .and_then(|id| id.rsplit('/').next())
         .map(|s| s.to_string())
+}
+
+/// Spawns an incremental refresh that:
+/// 1. Searches for new jobs with start_time > latest_start_time
+/// 2. Re-enriches active (non-terminal) jobs to pick up status changes
+/// 3. Enriches any new jobs found
+pub fn spawn_incremental_refresh(
+    client: AzureClient,
+    username: String,
+    action_tx: ActionSender,
+    cancel: CancellationToken,
+    known_experiments: HashMap<String, String>,
+    latest_start_time: DateTime<Utc>,
+    active_job_ids: Vec<String>,
+) {
+    tokio::spawn(async move {
+        // Step 1: Check for new experiments (incremental)
+        let exp_names =
+            match fetch_experiments_incremental(&client, &cancel, &action_tx, known_experiments)
+                .await
+            {
+                Some(map) => map,
+                None => return,
+            };
+
+        if cancel.is_cancelled() {
+            return;
+        }
+
+        if !exp_names.is_empty() {
+            let _ = action_tx.send(Action::ExperimentCacheUpdated(exp_names.clone()));
+        }
+
+        // Step 2: Search for new jobs, sorted by start_time DESC, filter locally
+        if !exp_names.is_empty() {
+            let filter = format!("tags.mlflow.user='{}'", username);
+            let experiment_ids: Vec<String> = exp_names.keys().cloned().collect();
+
+            let request = SearchRunsRequest {
+                experiment_ids,
+                filter: Some(filter),
+                max_results: Some(MLFLOW_PAGE_SIZE),
+                order_by: Some(vec!["start_time DESC".to_string()]),
+                page_token: None,
+            };
+
+            match client.mlflow().search_runs(&request).await {
+                Ok(response) => {
+                    if cancel.is_cancelled() {
+                        return;
+                    }
+                    // Only keep runs newer than our latest known start_time
+                    let new_runs: Vec<RecentJobRow> = response
+                        .runs
+                        .iter()
+                        .map(|run| map_run_to_row(run, &exp_names))
+                        .filter(|row| {
+                            row.start_time
+                                .map(|st| st > latest_start_time)
+                                .unwrap_or(false)
+                        })
+                        .collect();
+
+                    if !new_runs.is_empty() {
+                        let _ =
+                            action_tx.send(Action::RecentJobsIncrementalBatch(new_runs.clone()));
+
+                        // Enrich new jobs
+                        let ids: Vec<String> = new_runs.iter().map(|r| r.id.clone()).collect();
+                        let enrich_client = client.clone();
+                        let enrich_tx = action_tx.clone();
+                        let enrich_cancel = cancel.clone();
+                        tokio::spawn(enrich_jobs(enrich_client, ids, enrich_tx, enrich_cancel));
+                    }
+                }
+                Err(e) => {
+                    if !cancel.is_cancelled() {
+                        let _ = action_tx.send(Action::Error(format!(
+                            "Failed to search for new runs: {}",
+                            e
+                        )));
+                    }
+                }
+            }
+        }
+
+        if cancel.is_cancelled() {
+            return;
+        }
+
+        // Step 3: Re-enrich active jobs to pick up status changes
+        if !active_job_ids.is_empty() {
+            enrich_jobs(client, active_job_ids, action_tx.clone(), cancel.clone()).await;
+        }
+
+        if !cancel.is_cancelled() {
+            let _ = action_tx.send(Action::RecentJobsFetchComplete);
+        }
+    });
 }

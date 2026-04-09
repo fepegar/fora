@@ -1,14 +1,14 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use chrono::DateTime;
+use chrono::{DateTime, Utc};
 use mlflow::SearchRunsRequest;
 use tokio::sync::Semaphore;
 use tokio_util::sync::CancellationToken;
 
 use crate::app::Action;
 use crate::client::AzureClient;
-use crate::tabs::recent_jobs::fetch::fetch_experiments_incremental;
+use crate::tabs::recent_jobs::fetch::{fetch_experiments_incremental, mlflow_status_to_job_status};
 use crate::tabs::recent_jobs::state::RecentJobRow;
 use crate::tabs::ActionSender;
 
@@ -251,7 +251,7 @@ fn map_run_to_row(run: &mlflow::Run, exp_names: &HashMap<String, String>) -> Rec
         display_name: run_name,
         experiment_name,
         experiment_id: run.info.experiment_id.clone(),
-        status: run.info.status.clone(),
+        status: mlflow_status_to_job_status(&run.info.status),
         start_time,
         end_time,
         user: run.info.user_id.clone(),
@@ -264,4 +264,115 @@ fn map_run_to_row(run: &mlflow::Run, exp_names: &HashMap<String, String>) -> Rec
         enriched: false,
         metric_keys,
     }
+}
+
+/// Spawns an incremental experiment refresh that:
+/// 1. Fetches new experiments (incrementally)
+/// 2. Searches for recent runs since latest_start_time across all experiments
+/// 3. Groups by experiment_id to find updated most_recent_job_time
+/// 4. Sends updates to the UI
+pub fn spawn_incremental_experiment_refresh(
+    client: AzureClient,
+    action_tx: ActionSender,
+    cancel: CancellationToken,
+    known_experiments: HashMap<String, String>,
+    latest_start_time: DateTime<Utc>,
+) {
+    tokio::spawn(async move {
+        // Step 1: Fetch experiments incrementally (discover new ones)
+        let exp_names =
+            match fetch_experiments_incremental(&client, &cancel, &action_tx, known_experiments)
+                .await
+            {
+                Some(map) => map,
+                None => {
+                    if !cancel.is_cancelled() {
+                        let _ = action_tx.send(Action::ExperimentIncrementalComplete);
+                    }
+                    return;
+                }
+            };
+
+        if cancel.is_cancelled() {
+            return;
+        }
+
+        if exp_names.is_empty() {
+            let _ = action_tx.send(Action::ExperimentIncrementalComplete);
+            return;
+        }
+
+        // Notify the tab of the updated experiment cache
+        let _ = action_tx.send(Action::ExperimentCacheUpdated(exp_names.clone()));
+
+        // Step 2: Search for recent runs sorted by start_time DESC, filter locally
+        let experiment_ids: Vec<String> = exp_names.keys().cloned().collect();
+
+        let request = SearchRunsRequest {
+            experiment_ids,
+            filter: None,
+            max_results: Some(MLFLOW_PAGE_SIZE),
+            order_by: Some(vec!["start_time DESC".to_string()]),
+            page_token: None,
+        };
+
+        match client.mlflow().search_runs(&request).await {
+            Ok(response) => {
+                if cancel.is_cancelled() {
+                    return;
+                }
+
+                // Group runs newer than latest by experiment_id, find max start_time
+                let mut experiment_updates: HashMap<String, Option<DateTime<Utc>>> = HashMap::new();
+
+                for run in &response.runs {
+                    let start_time = run
+                        .info
+                        .start_time
+                        .as_deref()
+                        .and_then(|s| s.parse::<i64>().ok())
+                        .and_then(DateTime::from_timestamp_millis);
+
+                    // Only consider runs newer than our latest known time
+                    let is_new = start_time.map(|st| st > latest_start_time).unwrap_or(false);
+                    if !is_new {
+                        continue;
+                    }
+
+                    let entry = experiment_updates
+                        .entry(run.info.experiment_id.clone())
+                        .or_insert(None);
+                    if let Some(st) = start_time {
+                        *entry = Some(entry.map(|cur| cur.max(st)).unwrap_or(st));
+                    }
+                }
+
+                if !experiment_updates.is_empty() {
+                    let updates: Vec<(String, String, Option<DateTime<Utc>>)> = experiment_updates
+                        .into_iter()
+                        .map(|(exp_id, max_time)| {
+                            let exp_name = exp_names
+                                .get(&exp_id)
+                                .cloned()
+                                .unwrap_or_else(|| exp_id.clone());
+                            (exp_id, exp_name, max_time)
+                        })
+                        .collect();
+                    let _ = action_tx.send(Action::ExperimentIncrementalUpdate(updates));
+                }
+            }
+            Err(e) => {
+                if !cancel.is_cancelled() {
+                    let _ = action_tx.send(Action::Error(format!(
+                        "Failed to search for recent runs: {}",
+                        e
+                    )));
+                }
+            }
+        }
+
+        if !cancel.is_cancelled() {
+            let _ = action_tx.send(Action::ExperimentIncrementalComplete);
+        }
+    });
 }

@@ -2,6 +2,7 @@ use std::io;
 use std::time::Duration;
 
 use anyhow::Result;
+use azure_ml::models::JobStatus;
 use chrono::{DateTime, Utc};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use crossterm::execute;
@@ -47,7 +48,12 @@ pub enum Action {
         environment_id: Option<String>,
         description: Option<String>,
         tags: HashMap<String, String>,
+        status: Option<JobStatus>,
+        end_time: Option<DateTime<Utc>>,
     },
+
+    // Incremental refresh for Recent Jobs
+    RecentJobsIncrementalBatch(Vec<RecentJobRow>),
 
     // Experiment cache (shared by Recent Jobs and Experiments tabs)
     ExperimentCacheUpdated(HashMap<String, String>),
@@ -63,6 +69,10 @@ pub enum Action {
         experiment_id: String,
         jobs: Vec<RecentJobRow>,
     },
+
+    // Incremental refresh for Experiments
+    ExperimentIncrementalUpdate(Vec<(String, String, Option<DateTime<Utc>>)>),
+    ExperimentIncrementalComplete,
 
     // Compute tab
     ComputeLoaded(Vec<ComputeRow>),

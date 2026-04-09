@@ -15,7 +15,7 @@ use crate::app::Action;
 use crate::client::AzureClient;
 use crate::components::job_detail::{self, JobDetail};
 use crate::tabs::ActionSender;
-use crate::theme::Theme;
+use crate::theme::{self, Theme};
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -769,36 +769,20 @@ pub fn spawn_metrics_fetcher(
 
 // ── Helpers ────────────────────────────────────────────────────────────
 
-fn add_status_field(lines: &mut Vec<Line<'_>>, label: &str, status: &str, max_label_width: usize) {
+fn add_status_field(
+    lines: &mut Vec<Line<'_>>,
+    label: &str,
+    status: &azure_ml::models::JobStatus,
+    max_label_width: usize,
+) {
     let padded = format!("{:>width$}", label, width = max_label_width);
-    let symbol = status_symbol(status);
-    let color = status_color(status);
+    let symbol = theme::job_status_symbol(status);
+    let color = theme::job_status_color(status);
+    let name = theme::job_status_display_name(status);
     lines.push(Line::from(vec![
         Span::styled(format!(" {} ", padded), Style::default().fg(Theme::DIM)),
-        Span::styled(format!("{} {}", symbol, status), Style::default().fg(color)),
+        Span::styled(format!("{} {}", symbol, name), Style::default().fg(color)),
     ]));
-}
-
-fn status_symbol(status: &str) -> &'static str {
-    match status {
-        "FINISHED" => "✓",
-        "FAILED" => "✗",
-        "RUNNING" => "●",
-        "KILLED" => "✕",
-        "SCHEDULED" | "STARTING" => "◯",
-        _ => "?",
-    }
-}
-
-fn status_color(status: &str) -> Color {
-    match status {
-        "FINISHED" => Theme::SUCCESS,
-        "FAILED" => Theme::ERROR,
-        "RUNNING" => Theme::RUNNING,
-        "KILLED" => Theme::DIM,
-        "SCHEDULED" | "STARTING" => Theme::WARNING,
-        _ => Theme::DIM,
-    }
 }
 
 fn extract_environment_name(env_id: &str) -> String {

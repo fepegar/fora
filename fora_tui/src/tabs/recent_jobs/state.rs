@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use azure_ml::models::JobStatus;
 use chrono::{DateTime, Utc};
 
 /// Flattened representation of a job for display in the Recent Jobs tab.
@@ -14,8 +15,8 @@ pub struct RecentJobRow {
     pub experiment_name: String,
     /// Experiment ID from MLflow.
     pub experiment_id: String,
-    /// Job status string (e.g. "FINISHED", "FAILED", "KILLED", "RUNNING").
-    pub status: String,
+    /// Job status.
+    pub status: JobStatus,
     /// Start time as UTC datetime.
     pub start_time: Option<DateTime<Utc>>,
     /// End time as UTC datetime.
@@ -41,5 +42,6 @@ pub enum FetchState {
     Idle,
     Loading,
     Complete,
+    Refreshing,
     Error,
 }

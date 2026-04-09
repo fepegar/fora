@@ -1,14 +1,15 @@
 use std::collections::HashMap;
 
+use azure_ml::models::JobStatus;
 use ratatui::layout::Rect;
-use ratatui::style::{Color, Modifier, Style};
+use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{
     Block, Borders, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, Wrap,
 };
 use ratatui::Frame;
 
-use crate::theme::Theme;
+use crate::theme::{self, Theme};
 
 /// Common job data for the detail pane, usable across tabs.
 pub struct JobDetail<'a> {
@@ -16,7 +17,7 @@ pub struct JobDetail<'a> {
     pub display_name: &'a str,
     pub experiment_name: &'a str,
     pub job_type: &'a str,
-    pub status: &'a str,
+    pub status: &'a JobStatus,
     pub compute_target: &'a str,
     pub created_at: Option<&'a str>,
     pub runtime: Option<&'a str>,
@@ -183,36 +184,20 @@ pub fn max_label_width(fields: &[(&str, &str)]) -> usize {
 }
 
 /// Status field with colored symbol.
-fn add_status_field(lines: &mut Vec<Line<'_>>, label: &str, status: &str, max_label_width: usize) {
+fn add_status_field(
+    lines: &mut Vec<Line<'_>>,
+    label: &str,
+    status: &JobStatus,
+    max_label_width: usize,
+) {
     let padded = format!("{:>width$}", label, width = max_label_width);
-    let symbol = mlflow_status_symbol(status);
-    let color = mlflow_status_color(status);
+    let symbol = theme::job_status_symbol(status);
+    let color = theme::job_status_color(status);
+    let name = theme::job_status_display_name(status);
     lines.push(Line::from(vec![
         Span::styled(format!(" {} ", padded), Style::default().fg(Theme::DIM)),
-        Span::styled(format!("{} {}", symbol, status), Style::default().fg(color)),
+        Span::styled(format!("{} {}", symbol, name), Style::default().fg(color)),
     ]));
-}
-
-fn mlflow_status_symbol(status: &str) -> &'static str {
-    match status {
-        "FINISHED" => "✓",
-        "FAILED" => "✗",
-        "RUNNING" => "●",
-        "KILLED" => "✕",
-        "SCHEDULED" | "STARTING" => "◯",
-        _ => "?",
-    }
-}
-
-fn mlflow_status_color(status: &str) -> Color {
-    match status {
-        "FINISHED" => Theme::SUCCESS,
-        "FAILED" => Theme::ERROR,
-        "RUNNING" => Theme::RUNNING,
-        "KILLED" => Theme::DIM,
-        "SCHEDULED" | "STARTING" => Theme::WARNING,
-        _ => Theme::DIM,
-    }
 }
 
 /// Extracts a short environment name from a full ARM resource ID.

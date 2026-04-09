@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use chrono::{DateTime, Utc};
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
@@ -48,6 +49,8 @@ pub struct ExperimentsTab {
     pending_experiments: Vec<ExperimentEntry>,
     /// Progress of experiment discovery probes (completed, total).
     discovery_progress: (usize, usize),
+    /// The latest start_time seen across all experiments, for incremental refresh.
+    latest_start_time: Option<DateTime<Utc>>,
 }
 
 impl ExperimentsTab {
@@ -79,6 +82,7 @@ impl ExperimentsTab {
             pending_cancel_job_id: None,
             pending_experiments: Vec::new(),
             discovery_progress: (0, 0),
+            latest_start_time: None,
         }
     }
 
@@ -169,6 +173,7 @@ impl ExperimentsTab {
         self.experiments.clear();
         self.pending_experiments.clear();
         self.discovery_progress = (0, 0);
+        self.latest_start_time = None;
         self.rebuild_flat_list();
 
         fetch::spawn_experiment_discovery(
@@ -177,6 +182,39 @@ impl ExperimentsTab {
             self.cancel_token.clone(),
             self.experiment_cache.clone(),
         );
+    }
+
+    fn start_incremental_refresh(&mut self, action_tx: &ActionSender) {
+        let Some(client) = self.client.clone() else {
+            return;
+        };
+        let Some(latest) = self.latest_start_time else {
+            // No data yet — fall back to full discovery
+            self.start_discovery(action_tx);
+            return;
+        };
+
+        self.cancel_token.cancel();
+        self.cancel_token = CancellationToken::new();
+
+        self.discovery_state = DiscoveryState::Refreshing;
+
+        fetch::spawn_incremental_experiment_refresh(
+            client,
+            action_tx.clone(),
+            self.cancel_token.clone(),
+            self.experiment_cache.clone(),
+            latest,
+        );
+    }
+
+    fn update_latest_start_time_from_experiments(&mut self) {
+        for exp in &self.experiments {
+            if let Some(t) = exp.most_recent_job_time {
+                self.latest_start_time =
+                    Some(self.latest_start_time.map(|cur| cur.max(t)).unwrap_or(t));
+            }
+        }
     }
 
     fn select_next(&mut self) {
@@ -281,7 +319,19 @@ impl Tab for ExperimentsTab {
                 }
                 KeyCode::Esc => false,
                 KeyCode::Char('r') => {
-                    self.start_discovery(action_tx);
+                    match self.discovery_state {
+                        DiscoveryState::Complete | DiscoveryState::Refreshing => {
+                            if self.experiments.is_empty() {
+                                self.start_discovery(action_tx);
+                            } else {
+                                self.start_incremental_refresh(action_tx);
+                            }
+                        }
+                        DiscoveryState::Loading => {
+                            self.start_discovery(action_tx);
+                        }
+                        DiscoveryState::Idle => {}
+                    }
                     true
                 }
                 KeyCode::Char('x') => {
@@ -332,6 +382,7 @@ impl Tab for ExperimentsTab {
                     .sort_by(|a, b| b.most_recent_job_time.cmp(&a.most_recent_job_time));
                 self.experiments = std::mem::take(&mut self.pending_experiments);
                 self.rebuild_flat_list();
+                self.update_latest_start_time_from_experiments();
                 self.discovery_state = DiscoveryState::Complete;
             }
             Action::ExperimentJobsLoaded {
@@ -356,6 +407,8 @@ impl Tab for ExperimentsTab {
                 environment_id,
                 description,
                 tags,
+                status,
+                end_time,
             } => {
                 // Update enriched fields on jobs within experiments
                 for exp in &mut self.experiments {
@@ -367,10 +420,60 @@ impl Tab for ExperimentsTab {
                             job.environment_id = environment_id.clone();
                             job.description = description.clone();
                             job.tags = tags.clone();
+                            if let Some(s) = status {
+                                job.status = s.clone();
+                            }
+                            if let Some(et) = end_time {
+                                job.end_time = Some(*et);
+                            }
                             job.enriched = true;
                         }
                     }
                 }
+            }
+            Action::ExperimentIncrementalUpdate(entries) => {
+                for (exp_id, exp_name, most_recent_time) in entries {
+                    if let Some(exp) = self
+                        .experiments
+                        .iter_mut()
+                        .find(|e| e.experiment_id == *exp_id)
+                    {
+                        // Update most_recent_job_time if newer
+                        if let Some(new_time) = most_recent_time {
+                            let should_update = exp
+                                .most_recent_job_time
+                                .map(|cur| *new_time > cur)
+                                .unwrap_or(true);
+                            if should_update {
+                                exp.most_recent_job_time = Some(*new_time);
+                                // Clear loaded jobs so they'll be re-fetched on expand
+                                if exp.expanded {
+                                    exp.jobs.clear();
+                                    exp.loading_jobs = false;
+                                    exp.expanded = false;
+                                }
+                            }
+                        }
+                    } else {
+                        // New experiment
+                        self.experiments.push(ExperimentEntry {
+                            experiment_id: exp_id.clone(),
+                            name: exp_name.clone(),
+                            most_recent_job_time: *most_recent_time,
+                            expanded: false,
+                            jobs: Vec::new(),
+                            loading_jobs: false,
+                        });
+                    }
+                }
+                // Re-sort experiments by most recent job time (newest first)
+                self.experiments
+                    .sort_by(|a, b| b.most_recent_job_time.cmp(&a.most_recent_job_time));
+                self.update_latest_start_time_from_experiments();
+                self.rebuild_flat_list();
+            }
+            Action::ExperimentIncrementalComplete => {
+                self.discovery_state = DiscoveryState::Complete;
             }
             Action::ExperimentCacheUpdated(cache) => {
                 self.experiment_cache = cache.clone();
@@ -499,6 +602,9 @@ impl ExperimentsTab {
                 } else {
                     format!(" {}", self.spinner.frame())
                 }
+            }
+            DiscoveryState::Refreshing => {
+                format!(" {}", self.spinner.frame())
             }
             DiscoveryState::Complete => String::new(),
         };

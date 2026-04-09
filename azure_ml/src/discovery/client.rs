@@ -18,7 +18,6 @@ const ARM_SCOPE: &str = "https://management.azure.com/.default";
 const GRAPH_SCOPE: &str = "https://graph.microsoft.com/.default";
 const ARM_SUBSCRIPTION_API_VERSION: &str = "2024-03-01";
 
-
 /// Client for discovering Azure resources (subscriptions, resource groups, ML workspaces)
 /// and fetching the current user's profile from Microsoft Graph.
 pub struct DiscoveryClient {

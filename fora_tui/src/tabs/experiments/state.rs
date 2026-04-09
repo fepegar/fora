@@ -30,4 +30,5 @@ pub enum DiscoveryState {
     Idle,
     Loading,
     Complete,
+    Refreshing,
 }

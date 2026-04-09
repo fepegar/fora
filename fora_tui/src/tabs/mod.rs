@@ -15,11 +15,26 @@ use crate::client::AzureClient;
 /// Sender for dispatching actions from tabs back to the app.
 pub type ActionSender = mpsc::UnboundedSender<Action>;
 
+use azure_ml::models::JobStatus;
+
 /// Check whether a job status indicates the job can be cancelled.
-pub fn is_job_cancelable(status: &str) -> bool {
+pub fn is_job_cancelable(status: &JobStatus) -> bool {
     matches!(
-        status.to_lowercase().as_str(),
-        "running" | "queued" | "starting" | "preparing" | "notstarted" | "provisioning"
+        status,
+        JobStatus::Running
+            | JobStatus::Queued
+            | JobStatus::Starting
+            | JobStatus::Preparing
+            | JobStatus::NotStarted
+            | JobStatus::Provisioning
+    )
+}
+
+/// Check whether a job status is non-terminal (job may still change).
+pub fn is_active_status(status: &JobStatus) -> bool {
+    !matches!(
+        status,
+        JobStatus::Completed | JobStatus::Failed | JobStatus::Canceled
     )
 }
 

@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use chrono::{DateTime, Utc};
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::widgets::{Block, Borders};
@@ -15,7 +16,7 @@ use crate::components::detail_pane::{self, DetailKeyResult, DetailPane};
 use crate::components::job_detail::JobDetail;
 use crate::components::search_bar::SearchBar;
 use crate::components::spinner::Spinner;
-use crate::tabs::{is_job_cancelable, spawn_cancel_job, ActionSender, Tab};
+use crate::tabs::{is_active_status, is_job_cancelable, spawn_cancel_job, ActionSender, Tab};
 use crate::theme;
 use crate::widgets::table::{self, ListState};
 
@@ -42,6 +43,8 @@ pub struct RecentJobsTab {
     confirm_dialog: ConfirmDialog,
     /// Job ID pending cancellation (set when confirm dialog is shown).
     pending_cancel_job_id: Option<(String, String)>,
+    /// The latest start_time seen across all loaded jobs, for incremental refresh.
+    latest_start_time: Option<DateTime<Utc>>,
 }
 
 impl RecentJobsTab {
@@ -71,6 +74,7 @@ impl RecentJobsTab {
             experiment_cache,
             confirm_dialog: ConfirmDialog::default(),
             pending_cancel_job_id: None,
+            latest_start_time: None,
         }
     }
 
@@ -110,6 +114,7 @@ impl RecentJobsTab {
         self.all_jobs.clear();
         self.filtered_jobs.clear();
         self.list_state.set_total(0);
+        self.latest_start_time = None;
 
         fetch::spawn_recent_jobs_fetcher(
             client,
@@ -118,6 +123,49 @@ impl RecentJobsTab {
             self.cancel_token.clone(),
             self.experiment_cache.clone(),
         );
+    }
+
+    fn start_incremental_refresh(&mut self, action_tx: &ActionSender) {
+        let Some(client) = self.client.clone() else {
+            return;
+        };
+        let Some(latest) = self.latest_start_time else {
+            // No data yet — fall back to full fetch
+            self.start_fetch(action_tx);
+            return;
+        };
+
+        self.cancel_token.cancel();
+        self.cancel_token = CancellationToken::new();
+
+        self.fetch_state = FetchState::Refreshing;
+
+        // Collect IDs of jobs with non-terminal status for re-enrichment
+        let active_job_ids: Vec<String> = self
+            .all_jobs
+            .iter()
+            .filter(|j| is_active_status(&j.status))
+            .map(|j| j.id.clone())
+            .collect();
+
+        fetch::spawn_incremental_refresh(
+            client,
+            self.username.clone(),
+            action_tx.clone(),
+            self.cancel_token.clone(),
+            self.experiment_cache.clone(),
+            latest,
+            active_job_ids,
+        );
+    }
+
+    fn update_latest_start_time(&mut self, rows: &[RecentJobRow]) {
+        for row in rows {
+            if let Some(st) = row.start_time {
+                self.latest_start_time =
+                    Some(self.latest_start_time.map(|cur| cur.max(st)).unwrap_or(st));
+            }
+        }
     }
 }
 
@@ -230,7 +278,24 @@ impl Tab for RecentJobsTab {
         match action {
             Action::RecentJobsBatchLoaded(rows) => {
                 self.all_jobs.extend(rows.iter().cloned());
+                self.update_latest_start_time(rows);
                 self.apply_filter();
+            }
+            Action::RecentJobsIncrementalBatch(rows) => {
+                // Deduplicate: only prepend jobs not already in all_jobs
+                let new_rows: Vec<_> = rows
+                    .iter()
+                    .filter(|r| !self.all_jobs.iter().any(|j| j.id == r.id))
+                    .cloned()
+                    .collect();
+                if !new_rows.is_empty() {
+                    self.update_latest_start_time(&new_rows);
+                    // Prepend new jobs at the top (most recent first)
+                    let mut merged = new_rows;
+                    merged.append(&mut self.all_jobs);
+                    self.all_jobs = merged;
+                    self.apply_filter();
+                }
             }
             Action::RecentJobsFetchComplete => {
                 self.fetch_state = FetchState::Complete;
@@ -243,6 +308,8 @@ impl Tab for RecentJobsTab {
                 environment_id,
                 description,
                 tags,
+                status,
+                end_time,
             } => {
                 for job in self
                     .all_jobs
@@ -256,6 +323,12 @@ impl Tab for RecentJobsTab {
                         job.environment_id = environment_id.clone();
                         job.description = description.clone();
                         job.tags = tags.clone();
+                        if let Some(s) = status {
+                            job.status = s.clone();
+                        }
+                        if let Some(et) = end_time {
+                            job.end_time = Some(*et);
+                        }
                         job.enriched = true;
                     }
                 }
@@ -421,7 +494,19 @@ impl RecentJobsTab {
                 true
             }
             KeyCode::Char('r') => {
-                self.start_fetch(action_tx);
+                match self.fetch_state {
+                    FetchState::Complete | FetchState::Refreshing | FetchState::Error => {
+                        if self.all_jobs.is_empty() {
+                            self.start_fetch(action_tx);
+                        } else {
+                            self.start_incremental_refresh(action_tx);
+                        }
+                    }
+                    FetchState::Loading => {
+                        self.start_fetch(action_tx);
+                    }
+                    FetchState::Idle => {}
+                }
                 true
             }
             KeyCode::Char('x') => {
@@ -442,7 +527,7 @@ impl RecentJobsTab {
 
     fn render_list(&self, frame: &mut Frame, area: Rect) {
         let status_indicator = match self.fetch_state {
-            FetchState::Idle | FetchState::Loading => {
+            FetchState::Idle | FetchState::Loading | FetchState::Refreshing => {
                 format!(" {}", self.spinner.frame())
             }
             FetchState::Complete | FetchState::Error => String::new(),
