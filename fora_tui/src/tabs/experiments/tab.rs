@@ -43,6 +43,11 @@ pub struct ExperimentsTab {
     confirm_dialog: ConfirmDialog,
     /// Job ID + display name pending cancellation (set when confirm dialog is shown).
     pending_cancel_job_id: Option<(String, String)>,
+    /// Staging buffer for experiments discovered during parallel probing.
+    /// Accumulated here and moved into `experiments` on `ExperimentDiscoveryComplete`.
+    pending_experiments: Vec<ExperimentEntry>,
+    /// Progress of experiment discovery probes (completed, total).
+    discovery_progress: (usize, usize),
 }
 
 impl ExperimentsTab {
@@ -72,6 +77,8 @@ impl ExperimentsTab {
             experiment_cache,
             confirm_dialog: ConfirmDialog::default(),
             pending_cancel_job_id: None,
+            pending_experiments: Vec::new(),
+            discovery_progress: (0, 0),
         }
     }
 
@@ -160,6 +167,8 @@ impl ExperimentsTab {
 
         self.discovery_state = DiscoveryState::Loading;
         self.experiments.clear();
+        self.pending_experiments.clear();
+        self.discovery_progress = (0, 0);
         self.rebuild_flat_list();
 
         fetch::spawn_experiment_discovery(
@@ -295,10 +304,14 @@ impl Tab for ExperimentsTab {
     fn update(&mut self, action: &Action) {
         match action {
             Action::ExperimentsDiscovered(new_exps) => {
+                // Buffer experiments — they'll be sorted and displayed on completion.
                 for (exp_id, exp_name, most_recent_time) in new_exps {
-                    // Only add if not already present
-                    if !self.experiments.iter().any(|e| e.experiment_id == *exp_id) {
-                        self.experiments.push(ExperimentEntry {
+                    if !self
+                        .pending_experiments
+                        .iter()
+                        .any(|e| e.experiment_id == *exp_id)
+                    {
+                        self.pending_experiments.push(ExperimentEntry {
                             experiment_id: exp_id.clone(),
                             name: exp_name.clone(),
                             most_recent_job_time: *most_recent_time,
@@ -308,9 +321,17 @@ impl Tab for ExperimentsTab {
                         });
                     }
                 }
-                self.rebuild_flat_list();
+            }
+            Action::ExperimentDiscoveryProgress { completed, total } => {
+                self.discovery_progress = (*completed, *total);
             }
             Action::ExperimentDiscoveryComplete => {
+                // Sort buffered experiments by most recent job time (newest first).
+                // Experiments with no jobs (None) go to the bottom.
+                self.pending_experiments
+                    .sort_by(|a, b| b.most_recent_job_time.cmp(&a.most_recent_job_time));
+                self.experiments = std::mem::take(&mut self.pending_experiments);
+                self.rebuild_flat_list();
                 self.discovery_state = DiscoveryState::Complete;
             }
             Action::ExperimentJobsLoaded {
@@ -472,7 +493,12 @@ impl ExperimentsTab {
     fn render_list(&self, frame: &mut Frame, area: Rect) {
         let status_indicator = match self.discovery_state {
             DiscoveryState::Idle | DiscoveryState::Loading => {
-                format!(" {}", self.spinner.frame())
+                let (completed, total) = self.discovery_progress;
+                if total > 0 {
+                    format!(" {} {}/{}", self.spinner.frame(), completed, total)
+                } else {
+                    format!(" {}", self.spinner.frame())
+                }
             }
             DiscoveryState::Complete => String::new(),
         };

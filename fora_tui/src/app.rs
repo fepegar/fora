@@ -54,6 +54,10 @@ pub enum Action {
 
     // Experiments tab
     ExperimentsDiscovered(Vec<(String, String, Option<DateTime<Utc>>)>),
+    ExperimentDiscoveryProgress {
+        completed: usize,
+        total: usize,
+    },
     ExperimentDiscoveryComplete,
     ExperimentJobsLoaded {
         experiment_id: String,

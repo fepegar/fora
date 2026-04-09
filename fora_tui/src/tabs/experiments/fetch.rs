@@ -1,7 +1,9 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
 use mlflow::SearchRunsRequest;
+use tokio::sync::Semaphore;
 use tokio_util::sync::CancellationToken;
 
 use crate::app::Action;
@@ -10,20 +12,22 @@ use crate::tabs::recent_jobs::fetch::fetch_experiments_incremental;
 use crate::tabs::recent_jobs::state::RecentJobRow;
 use crate::tabs::ActionSender;
 
-/// How many runs to request per MLflow page for discovery.
+/// How many runs to request per MLflow page when loading all jobs for an experiment.
 pub const MLFLOW_PAGE_SIZE: u32 = 1000;
 
-/// Spawns a background task that discovers experiments ordered by most recent job.
+/// Maximum concurrent API calls when probing experiments for their latest job.
+const DISCOVERY_CONCURRENCY: usize = 200;
+
+/// Spawns a background task that discovers experiments by probing each one in parallel.
 ///
-/// Strategy: search all runs across all experiments ordered by start_time DESC.
-/// As runs come in, we note the first time each experiment_id appears — that's its
-/// "most recent job time" and determines sort order. We send experiment discovery
-/// events to the UI progressively.
+/// Strategy:
+/// 1. Fetch the full experiment list (incrementally when possible).
+/// 2. For each experiment, make a parallel `search_runs` call with `max_results=1`
+///    and `order_by=["start_time DESC"]` to find the most recent job time.
+/// 3. Wait for all probes to complete, then send the full batch to the UI so it
+///    can sort and display the complete list at once (no progressive reordering).
 ///
-/// The task checks `cancel` between pages and before sending actions,
-/// exiting early if cancellation has been requested.
-///
-/// Uses incremental experiment fetching when `known_experiments` is non-empty.
+/// Concurrency is limited by a semaphore to avoid overwhelming the API.
 pub fn spawn_experiment_discovery(
     client: AzureClient,
     action_tx: ActionSender,
@@ -57,86 +61,88 @@ pub fn spawn_experiment_discovery(
         // Notify the tab of the updated experiment cache
         let _ = action_tx.send(Action::ExperimentCacheUpdated(exp_names.clone()));
 
-        let experiment_ids: Vec<String> = exp_names.keys().cloned().collect();
+        // Step 2: Probe each experiment in parallel to find its most recent job time
+        let semaphore = Arc::new(Semaphore::new(DISCOVERY_CONCURRENCY));
+        let mut handles = Vec::new();
 
-        // Step 2: Search all runs ordered by start_time DESC
-        let mut page_token: Option<String> = None;
-        let mut seen_experiments: HashMap<String, DateTime<Utc>> = HashMap::new();
+        for (exp_id, exp_name) in &exp_names {
+            let client = client.clone();
+            let cancel = cancel.clone();
+            let semaphore = semaphore.clone();
+            let exp_id = exp_id.clone();
+            let exp_name = exp_name.clone();
 
-        loop {
-            if cancel.is_cancelled() {
-                return;
-            }
+            let handle = tokio::spawn(async move {
+                if cancel.is_cancelled() {
+                    return None;
+                }
 
-            let request = SearchRunsRequest {
-                experiment_ids: experiment_ids.clone(),
-                filter: None,
-                max_results: Some(MLFLOW_PAGE_SIZE),
-                order_by: Some(vec!["start_time DESC".to_string()]),
-                page_token: page_token.clone(),
-            };
+                let _permit = match semaphore.acquire().await {
+                    Ok(p) => p,
+                    Err(_) => return None, // semaphore closed
+                };
 
-            let response = match client.mlflow().search_runs(&request).await {
-                Ok(r) => r,
-                Err(e) => {
-                    if cancel.is_cancelled() {
-                        return;
+                if cancel.is_cancelled() {
+                    return None;
+                }
+
+                let request = SearchRunsRequest {
+                    experiment_ids: vec![exp_id.clone()],
+                    filter: None,
+                    max_results: Some(1),
+                    order_by: Some(vec!["start_time DESC".to_string()]),
+                    page_token: None,
+                };
+
+                let most_recent_time = match client.mlflow().search_runs(&request).await {
+                    Ok(response) => response.runs.first().and_then(|run| {
+                        run.info
+                            .start_time
+                            .as_deref()
+                            .and_then(|s| s.parse::<i64>().ok())
+                            .and_then(DateTime::from_timestamp_millis)
+                    }),
+                    Err(e) => {
+                        tracing::debug!("Failed to probe experiment {}: {}", exp_id, e);
+                        None
                     }
-                    let _ = action_tx.send(Action::Error(format!(
-                        "Failed to search runs for experiments: {}",
-                        e
-                    )));
-                    break;
-                }
-            };
+                };
 
+                Some((exp_id, exp_name, most_recent_time))
+            });
+
+            handles.push(handle);
+        }
+
+        // Collect all results, sending progress updates as probes complete
+        let total = handles.len();
+        let mut discovered = Vec::new();
+        for (i, handle) in handles.into_iter().enumerate() {
             if cancel.is_cancelled() {
                 return;
             }
-
-            // Process runs: discover experiments in order
-            let mut new_experiments = Vec::new();
-
-            for run in &response.runs {
-                let exp_id = &run.info.experiment_id;
-                if seen_experiments.contains_key(exp_id) {
-                    continue;
+            match handle.await {
+                Ok(Some(result)) => discovered.push(result),
+                Ok(None) => {} // cancelled or semaphore closed
+                Err(e) => {
+                    tracing::debug!("Experiment probe task panicked: {}", e);
                 }
-
-                let start_time = run
-                    .info
-                    .start_time
-                    .as_deref()
-                    .and_then(|s| s.parse::<i64>().ok())
-                    .and_then(DateTime::from_timestamp_millis);
-
-                let exp_name = exp_names
-                    .get(exp_id)
-                    .cloned()
-                    .unwrap_or_else(|| exp_id.clone());
-
-                if let Some(t) = start_time {
-                    seen_experiments.insert(exp_id.clone(), t);
-                }
-
-                new_experiments.push((exp_id.clone(), exp_name, start_time));
             }
-
-            if !new_experiments.is_empty() {
-                let _ = action_tx.send(Action::ExperimentsDiscovered(new_experiments));
-            }
-
-            match response.next_page_token {
-                Some(token) if !token.is_empty() => {
-                    page_token = Some(token);
-                }
-                _ => break,
-            }
+            let _ = action_tx.send(Action::ExperimentDiscoveryProgress {
+                completed: i + 1,
+                total,
+            });
         }
 
-        if !cancel.is_cancelled() {
-            let _ = action_tx.send(Action::ExperimentDiscoveryComplete);
+        if cancel.is_cancelled() {
+            return;
         }
+
+        if !discovered.is_empty() {
+            let _ = action_tx.send(Action::ExperimentsDiscovered(discovered));
+        }
+
+        let _ = action_tx.send(Action::ExperimentDiscoveryComplete);
     });
 }
 
