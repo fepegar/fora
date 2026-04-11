@@ -23,7 +23,7 @@ Or manually add the following to your mise config:
 ```toml
 # In your mise.toml
 [tools]
-"cargo:fora_cli" = { git = "https://github.com/samb-t/fora.git" }
+"cargo:https://github.com/samb-t/fora.git" = "latest"
 ```
 
 Then run:

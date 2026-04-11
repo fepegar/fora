@@ -20,9 +20,9 @@ features:
   - title: Terminal UI
     icon: 🖥️
     details: Browse recent jobs, experiments, and compute resources in an interactive TUI built with Ratatui.
-  - title: Job Submission
-    icon: 🚀
-    details: Submit training jobs to Azure ML from the command line. Handles code upload, environment creation, and job orchestration.
+  - title: Experiments & Metrics
+    icon: 📊
+    details: Search experiments and runs via MLflow integration. View metric histories and charts directly in your terminal.
   - title: TOML Configuration
     icon: ⚙️
     details: Simple TOML-based configuration for workspaces, UI preferences, and column layouts.
