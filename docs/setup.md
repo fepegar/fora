@@ -1,6 +1,6 @@
 # Setup
 
-Fora is configured via a TOML file. You must set up at least one workspace before using the TUI or submitting jobs.
+Fora is configured via a TOML file. You must set up at least one workspace before using the TUI.
 
 ## Quick start
 

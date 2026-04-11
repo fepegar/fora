@@ -2,12 +2,11 @@
 
 Azure ML from your terminal.
 
-Fora is a terminal UI and CLI for managing [Azure Machine Learning](https://azure.microsoft.com/en-us/products/machine-learning) workspaces. Browse jobs, experiments, and compute in an interactive TUI, or submit training jobs from the command line.
+Fora is a terminal UI for managing [Azure Machine Learning](https://azure.microsoft.com/en-us/products/machine-learning) workspaces. Browse jobs, experiments, and compute in an interactive TUI.
 
 ## Features
 
 - **Terminal UI** — Browse recent jobs, experiments, and compute resources in an interactive interface built with [Ratatui](https://ratatui.rs/)
-- **Job submission** — Submit training jobs to Azure ML with automatic code upload, environment creation, and job orchestration
 - **Multi-workspace** — Switch between Azure ML workspaces on the fly
 - **TOML configuration** — Simple config for workspaces, UI preferences, and column layouts
 
@@ -25,7 +24,7 @@ See the [installation docs](https://samb-t.github.io/fora/installation) for othe
 
 ## Quick start
 
-Either launch the TUI and setup a config interactively:
+Launch the TUI and set up a config interactively:
 
 ```bash
 fora
@@ -35,12 +34,6 @@ Or manually run the configuration setup:
 
 ```bash
 fora init
-```
-
-and then submit a job:
-
-```bash
-fora submit --compute my-cluster -- python train.py
 ```
 
 ## Documentation
