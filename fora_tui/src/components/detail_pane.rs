@@ -707,11 +707,12 @@ fn make_metric_series(key: String, points: Vec<(f64, f64)>) -> MetricSeries {
 
 // ── Metrics fetcher ────────────────────────────────────────────────────
 
-/// Spawn a background task to fetch metric histories for a run.
+/// Spawn background tasks to fetch metric histories for a run in parallel.
 ///
 /// Metrics are sent to the UI incrementally — each metric key dispatches
 /// a `MetricBatchLoaded` action as soon as its history is ready, so
 /// charts appear progressively rather than waiting for all metrics.
+/// All metrics are fetched concurrently for faster loading.
 pub fn spawn_metrics_fetcher(
     client: AzureClient,
     run_id: String,
@@ -719,49 +720,58 @@ pub fn spawn_metrics_fetcher(
     action_tx: ActionSender,
 ) {
     tokio::spawn(async move {
-        let mlflow = client.mlflow();
+        let mlflow = client.mlflow().clone();
+        let mut set = tokio::task::JoinSet::new();
 
-        for key in &metric_keys {
-            match mlflow.get_all_metric_history(&run_id, key).await {
-                Ok(history) => {
-                    // Skip data points with no value, NaN, or infinite values
-                    let valid: Vec<_> = history
-                        .iter()
-                        .filter(|m| matches!(m.value, Some(v) if v.is_finite()))
-                        .collect();
-                    // Use step as x-axis; if all steps are 0 (absent), fall back to index
-                    let all_zero_step = valid.iter().all(|m| m.step == 0);
-                    let mut points: Vec<(f64, f64)> = if all_zero_step {
-                        valid
-                            .iter()
-                            .enumerate()
-                            .map(|(i, m)| (i as f64, m.value.unwrap()))
-                            .collect()
-                    } else {
-                        valid
-                            .iter()
-                            .map(|m| (m.step as f64, m.value.unwrap()))
-                            .collect()
-                    };
-                    points
-                        .sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+        for key in metric_keys {
+            let mlflow = mlflow.clone();
+            let run_id = run_id.clone();
+            let action_tx = action_tx.clone();
 
-                    if !points.is_empty() {
-                        let _ = action_tx.send(Action::MetricBatchLoaded {
-                            run_id: run_id.clone(),
-                            metric: (key.clone(), points),
+            set.spawn(async move {
+                match mlflow.get_all_metric_history(&run_id, &key).await {
+                    Ok(history) => {
+                        // Skip data points with no value, NaN, or infinite values
+                        let valid: Vec<_> = history
+                            .iter()
+                            .filter(|m| matches!(m.value, Some(v) if v.is_finite()))
+                            .collect();
+                        // Use step as x-axis; if all steps are 0 (absent), fall back to index
+                        let all_zero_step = valid.iter().all(|m| m.step == 0);
+                        let mut points: Vec<(f64, f64)> = if all_zero_step {
+                            valid
+                                .iter()
+                                .enumerate()
+                                .map(|(i, m)| (i as f64, m.value.unwrap()))
+                                .collect()
+                        } else {
+                            valid
+                                .iter()
+                                .map(|m| (m.step as f64, m.value.unwrap()))
+                                .collect()
+                        };
+                        points.sort_by(|a, b| {
+                            a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal)
+                        });
+
+                        if !points.is_empty() {
+                            let _ = action_tx.send(Action::MetricBatchLoaded {
+                                run_id,
+                                metric: (key, points),
+                            });
+                        }
+                    }
+                    Err(e) => {
+                        let _ = action_tx.send(Action::MetricsFetchFailed {
+                            run_id,
+                            error: format!("Failed to fetch metric '{}': {}", key, e),
                         });
                     }
                 }
-                Err(e) => {
-                    let _ = action_tx.send(Action::MetricsFetchFailed {
-                        run_id: run_id.clone(),
-                        error: format!("Failed to fetch metric '{}': {}", key, e),
-                    });
-                    return;
-                }
-            }
+            });
         }
+
+        while set.join_next().await.is_some() {}
 
         let _ = action_tx.send(Action::MetricsFetchComplete { run_id });
     });
