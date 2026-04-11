@@ -47,6 +47,7 @@ pub struct RecentJobsTab {
     pending_cancel_job_id: Option<(String, String)>,
     /// The latest start_time seen across all loaded jobs, for incremental refresh.
     latest_start_time: Option<DateTime<Utc>>,
+    tz: chrono_tz::Tz,
 }
 
 impl RecentJobsTab {
@@ -55,8 +56,9 @@ impl RecentJobsTab {
         username: String,
         column_config: Option<&[String]>,
         experiment_cache: HashMap<String, String>,
+        tz: chrono_tz::Tz,
     ) -> Self {
-        let mut columns = default_columns();
+        let mut columns = default_columns(tz);
         table::apply_column_config(&mut columns, column_config);
 
         Self {
@@ -77,6 +79,7 @@ impl RecentJobsTab {
             confirm_dialog: ConfirmDialog::default(),
             pending_cancel_job_id: None,
             latest_start_time: None,
+            tz,
         }
     }
 
@@ -450,7 +453,7 @@ impl Tab for RecentJobsTab {
             let job_data = self.selected_job().map(|job| {
                 let created = job
                     .start_time
-                    .map(|t| t.format("%Y-%m-%d %H:%M:%S UTC").to_string());
+                    .map(|t| t.with_timezone(&self.tz).format("%Y-%m-%d %H:%M:%S %Z").to_string());
                 let runtime = crate::format::format_runtime(job.start_time, job.end_time);
                 (
                     job.id.clone(),

@@ -10,34 +10,33 @@ pub fn default_columns() -> Vec<ColumnDef<ComputeRow>> {
         ColumnDef::new(
             "name",
             "Name",
-            (|r: &ComputeRow| r.name.clone()) as fn(&ComputeRow) -> String,
+            |r: &ComputeRow| r.name.clone(),
             20,
         )
         .with_min_width(8),
         ColumnDef::new(
             "type",
             "Type",
-            (|r: &ComputeRow| r.compute_type.clone()) as fn(&ComputeRow) -> String,
+            |r: &ComputeRow| r.compute_type.clone(),
             16,
         )
         .with_min_width(6),
         ColumnDef::new(
             "vm_size",
             "VM Size",
-            (|r: &ComputeRow| r.vm_size.clone().unwrap_or_else(|| "—".to_string()))
-                as fn(&ComputeRow) -> String,
+            |r: &ComputeRow| r.vm_size.clone().unwrap_or_else(|| "—".to_string()),
             20,
         )
         .with_min_width(8),
         ColumnDef::new(
             "state",
             "State",
-            (|r: &ComputeRow| {
+            |r: &ComputeRow| {
                 r.provisioning_state
                     .as_ref()
                     .map(|s| format!("{:?}", s))
                     .unwrap_or_else(|| "—".to_string())
-            }) as fn(&ComputeRow) -> String,
+            },
             12,
         )
         .with_style(|r: &ComputeRow| {
@@ -54,52 +53,51 @@ pub fn default_columns() -> Vec<ColumnDef<ComputeRow>> {
         ColumnDef::new(
             "running",
             "Running",
-            (|r: &ComputeRow| {
+            |r: &ComputeRow| {
                 r.running_nodes
                     .map(|n| n.to_string())
                     .unwrap_or_else(|| "—".to_string())
-            }) as fn(&ComputeRow) -> String,
+            },
             8,
         )
         .with_min_width(4),
         ColumnDef::new(
             "idle",
             "Idle",
-            (|r: &ComputeRow| {
+            |r: &ComputeRow| {
                 r.idle_nodes
                     .map(|n| n.to_string())
                     .unwrap_or_else(|| "—".to_string())
-            }) as fn(&ComputeRow) -> String,
+            },
             6,
         )
         .with_min_width(4),
         ColumnDef::new(
             "nodes",
             "Nodes",
-            (|r: &ComputeRow| {
+            |r: &ComputeRow| {
                 r.current_node_count
                     .map(|n| n.to_string())
                     .unwrap_or_else(|| "—".to_string())
-            }) as fn(&ComputeRow) -> String,
+            },
             6,
         )
         .with_min_width(4),
         ColumnDef::new(
             "max",
             "Max",
-            (|r: &ComputeRow| {
+            |r: &ComputeRow| {
                 r.max_nodes
                     .map(|n| n.to_string())
                     .unwrap_or_else(|| "—".to_string())
-            }) as fn(&ComputeRow) -> String,
+            },
             5,
         )
         .with_min_width(4),
         ColumnDef::new(
             "priority",
             "Priority",
-            (|r: &ComputeRow| r.vm_priority.clone().unwrap_or_else(|| "—".to_string()))
-                as fn(&ComputeRow) -> String,
+            |r: &ComputeRow| r.vm_priority.clone().unwrap_or_else(|| "—".to_string()),
             12,
         )
         .hidden()

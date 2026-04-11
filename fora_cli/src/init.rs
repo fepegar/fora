@@ -6,7 +6,7 @@ use azure_identity::AzureCliCredential;
 use azure_ml::discovery::{DiscoveryClient, Subscription};
 use azure_ml::models::Workspace;
 use azure_ml::MachineLearningServicesClient;
-use fora_tui::config::{AppConfig, WorkspaceConfig};
+use fora_tui::config::{AppConfig, UiConfig, WorkspaceConfig};
 use futures::StreamExt;
 
 /// Collected info about a discovered workspace, ready for config generation.
@@ -184,6 +184,30 @@ pub async fn run_init_wizard() -> Result<()> {
         None
     };
 
+    // Select timezone
+    let tz_names: Vec<String> = chrono_tz::TZ_VARIANTS
+        .iter()
+        .map(|tz| tz.name().to_string())
+        .collect();
+    let timezone: String = cliclack::input("Enter your timezone")
+        .placeholder("Europe/London")
+        .default_input("UTC")
+        .autocomplete(tz_names)
+        .validate(|input: &String| {
+            if input.parse::<chrono_tz::Tz>().is_ok() {
+                Ok(())
+            } else {
+                Err("Invalid timezone. Use an IANA name like Europe/London or America/New_York.".to_string())
+            }
+        })
+        .interact()
+        .context("Timezone input cancelled")?;
+    let timezone = if timezone == "UTC" {
+        None
+    } else {
+        Some(timezone)
+    };
+
     // Select config file location
     let global_path = AppConfig::global_config_path();
     let config_location: String = cliclack::select("Where should the config file be saved?")
@@ -228,7 +252,10 @@ pub async fn run_init_wizard() -> Result<()> {
         .collect();
 
     let config = AppConfig {
-        ui: Default::default(),
+        ui: UiConfig {
+            timezone,
+            ..Default::default()
+        },
         default_workspace,
         workspaces: workspace_configs,
         columns: Default::default(),

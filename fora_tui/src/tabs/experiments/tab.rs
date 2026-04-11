@@ -51,16 +51,17 @@ pub struct ExperimentsTab {
     discovery_progress: (usize, usize),
     /// The latest start_time seen across all experiments, for incremental refresh.
     latest_start_time: Option<DateTime<Utc>>,
+    tz: chrono_tz::Tz,
 }
 
 impl ExperimentsTab {
-    pub fn new(client: Option<AzureClient>, experiment_cache: HashMap<String, String>) -> Self {
+    pub fn new(client: Option<AzureClient>, experiment_cache: HashMap<String, String>, tz: chrono_tz::Tz) -> Self {
         let mut table_state = TableState::default();
         table_state.select(Some(0));
 
         // Use the same columns as the Recent Jobs tab, but skip the "experiment"
         // column since it's redundant (the experiment header is right above).
-        let job_columns: Vec<ColumnDef<RecentJobRow>> = job_default_columns()
+        let job_columns: Vec<ColumnDef<RecentJobRow>> = job_default_columns(tz)
             .into_iter()
             .filter(|c| c.id != "experiment")
             .collect();
@@ -83,6 +84,7 @@ impl ExperimentsTab {
             pending_experiments: Vec::new(),
             discovery_progress: (0, 0),
             latest_start_time: None,
+            tz,
         }
     }
 
@@ -515,7 +517,7 @@ impl Tab for ExperimentsTab {
             let job_data = self.selected_job().map(|job| {
                 let created = job
                     .start_time
-                    .map(|t| t.format("%Y-%m-%d %H:%M:%S UTC").to_string());
+                    .map(|t| t.with_timezone(&self.tz).format("%Y-%m-%d %H:%M:%S %Z").to_string());
                 let runtime = crate::format::format_runtime(job.start_time, job.end_time);
                 (
                     job.id.clone(),
@@ -679,7 +681,7 @@ impl ExperimentsTab {
                     };
                     let recent = exp
                         .most_recent_job_time
-                        .map(|t| t.format("%Y-%m-%d %H:%M").to_string())
+                        .map(|t| t.with_timezone(&self.tz).format("%Y-%m-%d %H:%M").to_string())
                         .unwrap_or_default();
 
                     // Experiment header: bold name in first cell, last activity in last cell

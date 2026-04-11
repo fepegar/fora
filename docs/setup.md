@@ -41,6 +41,9 @@ Here is a complete example configuration:
 show_help_bar = true
 # Auto-refresh interval in seconds.
 refresh_interval_secs = 30
+# IANA timezone for displaying timestamps (e.g. "Europe/London", "America/New_York").
+# Handles daylight saving time automatically. Defaults to UTC if unset.
+timezone = "Europe/London"
 
 # Workspace shown when launching the TUI (must match a workspace name below).
 default_workspace = "prod"
@@ -76,6 +79,7 @@ compute = ["name", "type", "state", "vm_size"]
 |-------|------|---------|-------------|
 | `show_help_bar` | bool | `true` | Show the keyboard shortcut help bar at the bottom of the TUI. |
 | `refresh_interval_secs` | integer | `30` | Auto-refresh interval in seconds. |
+| `timezone` | string | `"UTC"` | IANA timezone name for displaying timestamps (e.g. `"Europe/London"`, `"America/New_York"`). Handles daylight saving time automatically. |
 
 ### Top-level fields
 

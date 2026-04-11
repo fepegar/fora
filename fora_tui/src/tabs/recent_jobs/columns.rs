@@ -4,23 +4,23 @@ use crate::widgets::table::ColumnDef;
 
 use super::state::RecentJobRow;
 
-pub fn default_columns() -> Vec<ColumnDef<RecentJobRow>> {
+pub fn default_columns(tz: chrono_tz::Tz) -> Vec<ColumnDef<RecentJobRow>> {
     vec![
         ColumnDef::new(
             "display_name",
             "Display Name",
-            (|r: &RecentJobRow| r.display_name.clone()) as fn(&RecentJobRow) -> String,
+            |r: &RecentJobRow| r.display_name.clone(),
             30,
         )
         .with_min_width(10),
         ColumnDef::new(
             "status",
             "Status",
-            (|r: &RecentJobRow| {
+            |r: &RecentJobRow| {
                 let sym = theme::job_status_symbol(&r.status);
                 let name = theme::job_status_display_name(&r.status);
                 format!("{} {}", sym, name)
-            }) as fn(&RecentJobRow) -> String,
+            },
             16,
         )
         .with_style(|r: &RecentJobRow| theme::job_status_style(&r.status))
@@ -28,42 +28,39 @@ pub fn default_columns() -> Vec<ColumnDef<RecentJobRow>> {
         ColumnDef::new(
             "experiment",
             "Experiment",
-            (|r: &RecentJobRow| r.experiment_name.clone()) as fn(&RecentJobRow) -> String,
+            |r: &RecentJobRow| r.experiment_name.clone(),
             20,
         )
         .with_min_width(8),
         ColumnDef::new(
             "runtime",
             "Runtime",
-            (|r: &RecentJobRow| format_runtime(r.start_time, r.end_time))
-                as fn(&RecentJobRow) -> String,
+            |r: &RecentJobRow| format_runtime(r.start_time, r.end_time),
             12,
         )
         .with_min_width(6),
         ColumnDef::new(
             "started",
             "Started",
-            (|r: &RecentJobRow| {
+            move |r: &RecentJobRow| {
                 r.start_time
-                    .map(|t| t.format("%Y-%m-%d %H:%M").to_string())
+                    .map(|t| t.with_timezone(&tz).format("%Y-%m-%d %H:%M").to_string())
                     .unwrap_or_else(|| "—".to_string())
-            }) as fn(&RecentJobRow) -> String,
+            },
             18,
         )
         .with_min_width(10),
         ColumnDef::new(
             "compute",
             "Compute",
-            (|r: &RecentJobRow| r.compute_target.as_deref().unwrap_or("—").to_string())
-                as fn(&RecentJobRow) -> String,
+            |r: &RecentJobRow| r.compute_target.as_deref().unwrap_or("—").to_string(),
             16,
         )
         .with_min_width(6),
         ColumnDef::new(
             "type",
             "Type",
-            (|r: &RecentJobRow| r.job_type.as_deref().unwrap_or("—").to_string())
-                as fn(&RecentJobRow) -> String,
+            |r: &RecentJobRow| r.job_type.as_deref().unwrap_or("—").to_string(),
             10,
         )
         .hidden()
@@ -71,7 +68,7 @@ pub fn default_columns() -> Vec<ColumnDef<RecentJobRow>> {
         ColumnDef::new(
             "id",
             "Job ID",
-            (|r: &RecentJobRow| r.id.clone()) as fn(&RecentJobRow) -> String,
+            |r: &RecentJobRow| r.id.clone(),
             20,
         )
         .hidden()

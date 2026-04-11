@@ -173,8 +173,9 @@ impl App {
                 username.clone(),
                 config.columns.jobs.as_deref(),
                 initial_exp_cache.clone(),
+                config.ui.tz(),
             )),
-            Box::new(ExperimentsTab::new(client.clone(), initial_exp_cache)),
+            Box::new(ExperimentsTab::new(client.clone(), initial_exp_cache, config.ui.tz())),
             Box::new(ComputeTab::new(
                 client,
                 refresh_interval,
@@ -412,14 +413,16 @@ impl App {
 
                     // Recreate tabs with new client
                     let refresh = self.config.ui.refresh_interval_secs;
+                    let tz = self.config.ui.tz();
                     self.tabs = vec![
                         Box::new(RecentJobsTab::new(
                             Some(client.clone()),
                             self.username.clone(),
                             self.config.columns.jobs.as_deref(),
                             exp_cache.clone(),
+                            tz,
                         )),
-                        Box::new(ExperimentsTab::new(Some(client.clone()), exp_cache)),
+                        Box::new(ExperimentsTab::new(Some(client.clone()), exp_cache, tz)),
                         Box::new(ComputeTab::new(
                             Some(client),
                             refresh,

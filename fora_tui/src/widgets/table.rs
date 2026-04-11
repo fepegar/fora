@@ -12,7 +12,7 @@ use crate::theme::{self};
 pub struct ColumnDef<T> {
     pub id: &'static str,
     pub label: &'static str,
-    pub extract: fn(&T) -> String,
+    pub extract: Box<dyn Fn(&T) -> String>,
     pub style: Option<fn(&T) -> Style>,
     pub min_width: u16,
     pub default_width: u16,
@@ -24,13 +24,13 @@ impl<T> ColumnDef<T> {
     pub fn new(
         id: &'static str,
         label: &'static str,
-        extract: fn(&T) -> String,
+        extract: impl Fn(&T) -> String + 'static,
         default_width: u16,
     ) -> Self {
         Self {
             id,
             label,
-            extract,
+            extract: Box::new(extract),
             style: None,
             min_width: 4,
             default_width,

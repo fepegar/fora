@@ -23,6 +23,9 @@ pub struct UiConfig {
     pub show_help_bar: bool,
     #[serde(default = "default_refresh_interval")]
     pub refresh_interval_secs: u64,
+    /// IANA timezone name (e.g. "Europe/London"). Defaults to UTC if unset.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timezone: Option<String>,
 }
 
 impl Default for UiConfig {
@@ -30,6 +33,7 @@ impl Default for UiConfig {
         Self {
             show_help_bar: default_show_help_bar(),
             refresh_interval_secs: default_refresh_interval(),
+            timezone: None,
         }
     }
 }
@@ -38,6 +42,15 @@ impl UiConfig {
     fn is_default(&self) -> bool {
         self.show_help_bar == default_show_help_bar()
             && self.refresh_interval_secs == default_refresh_interval()
+            && self.timezone.is_none()
+    }
+
+    /// Returns the configured timezone, falling back to UTC if unset or invalid.
+    pub fn tz(&self) -> chrono_tz::Tz {
+        self.timezone
+            .as_deref()
+            .and_then(|s| s.parse::<chrono_tz::Tz>().ok())
+            .unwrap_or(chrono_tz::Tz::UTC)
     }
 }
 
