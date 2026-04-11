@@ -1,126 +1,61 @@
-# Fora - Azure ML Management Tools
+# Fora
 
-A collection of Rust tools for managing Azure Machine Learning workspaces, built as a Cargo workspace.
+Azure ML from your terminal.
 
-## Workspace Structure
+Fora is a terminal UI and CLI for managing [Azure Machine Learning](https://azure.microsoft.com/en-us/products/machine-learning) workspaces. Browse jobs, experiments, and compute in an interactive TUI, or submit training jobs from the command line.
 
-This project is organized as a Rust workspace with the following crates:
+## Features
 
-### `azure_ml`
-A library crate providing:
-- High-level Azure ML REST API client (`AzureMLClient`)
-- Authentication handling using Azure Identity
-- Type-safe operations for common Azure ML resources
+- **Terminal UI** — Browse recent jobs, experiments, and compute resources in an interactive interface built with [Ratatui](https://ratatui.rs/)
+- **Job submission** — Submit training jobs to Azure ML with automatic code upload, environment creation, and job orchestration
+- **Multi-workspace** — Switch between Azure ML workspaces on the fly
+- **TOML configuration** — Simple config for workspaces, UI preferences, and column layouts
 
-### `fora_tui` 
-A terminal user interface application for managing Azure ML workspaces, featuring:
-- Interactive browsing of jobs, models, environments, and data assets
-- Real-time status monitoring
-- Tabbed interface with keyboard navigation
-- Built with [Ratatui](https://ratatui.rs/)
+## Install
 
-## Getting Started
-
-### Prerequisites
-
-- Rust 1.70 or later
-- Azure CLI installed and authenticated, or other Azure credential provider
-- Access to an Azure ML workspace
-
-### Building
+Requires the [Rust toolchain](https://rustup.rs/) and [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli) (`az login`).
 
 ```bash
-# Build the entire workspace
-cargo build
-
-# Build specific crates
-cargo build -p azure_ml
-cargo build -p fora_tui
+git clone https://github.com/samb-t/fora.git
+cd fora
+cargo install --path fora_cli
 ```
 
-### Running the TUI
+See the [installation docs](https://samb-t.github.io/fora/installation) for other methods including [mise](https://mise.jdx.dev/).
+
+## Quick start
+
+Either launch the TUI and setup a config interactively:
 
 ```bash
-# Run the terminal interface
-cargo run -p fora_tui
-
-# Or install and run
-cargo install --path fora_tui
-fora_tui
+fora
 ```
 
-### Configuration
+Or manually run the configuration setup:
 
-The TUI application will prompt for Azure configuration on first run:
-- Subscription ID
-- Resource Group
-- Workspace Name
+```bash
+fora init
+```
 
-Configuration is stored in your system's config directory.
+and then submit a job:
+
+```bash
+fora submit --compute my-cluster -- python train.py
+```
+
+## Documentation
+
+Full documentation is available at **[samb-t.github.io/fora](https://samb-t.github.io/fora/)**.
 
 ## Development
 
-### Testing
-
 ```bash
-# Test the entire workspace
-cargo test
-
-# Test specific crates
-cargo test -p azure_ml
-cargo test -p fora_tui
+cargo build                                    # build
+cargo test --all                               # test
+cargo clippy --all-targets --all-features      # lint
+cargo fmt --all                                # format
 ```
-
-### Adding Dependencies
-
-Dependencies are managed at the workspace level in the root `Cargo.toml`. Add shared dependencies to the `[workspace.dependencies]` section, then reference them in individual crate `Cargo.toml` files using `{ workspace = true }`.
-
-## Architecture
-
-### Azure ML Client
-
-The `azure_ml` crate provides a high-level client that abstracts Azure ML REST API operations:
-
-```rust
-use azure_ml::{AzureMLClient, AzureMLConfig};
-
-let config = AzureMLConfig {
-    subscription_id: "your-subscription-id".to_string(),
-    resource_group_name: "your-rg".to_string(),
-    workspace_name: "your-workspace".to_string(),
-    ..Default::default()
-};
-
-let client = AzureMLClient::new(config)?;
-let jobs = client.list_jobs().await?;
-```
-
-### TUI Application
-
-The `fora_tui` crate implements a tabbed interface with:
-- **Home**: Workspace overview and quick actions
-- **Jobs**: Browse and monitor ML jobs
-- **Models**: Manage model versions
-- **Compute**: View compute resources
-- **Data**: Browse data assets
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests where appropriate
-5. Run `cargo fmt` and `cargo clippy`
-6. Submit a pull request
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Future Plans
-
-- CLI interface (`fora_cli` crate)
-- Additional Azure ML resource types
-- Integration with MLflow
-- Deployment management
-- Cost tracking and optimization
+MIT
