@@ -197,7 +197,10 @@ pub async fn run_init_wizard() -> Result<()> {
             if input.parse::<chrono_tz::Tz>().is_ok() {
                 Ok(())
             } else {
-                Err("Invalid timezone. Use an IANA name like Europe/London or America/New_York.".to_string())
+                Err(
+                    "Invalid timezone. Use an IANA name like Europe/London or America/New_York."
+                        .to_string(),
+                )
             }
         })
         .interact()

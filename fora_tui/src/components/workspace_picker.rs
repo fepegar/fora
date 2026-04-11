@@ -119,21 +119,11 @@ impl WorkspacePicker {
 }
 
 /// Confirmation dialog for destructive actions.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct ConfirmDialog {
     pub active: bool,
     pub message: String,
     pub selected_yes: bool,
-}
-
-impl Default for ConfirmDialog {
-    fn default() -> Self {
-        Self {
-            active: false,
-            message: String::new(),
-            selected_yes: false,
-        }
-    }
 }
 
 impl ConfirmDialog {

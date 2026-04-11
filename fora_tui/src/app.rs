@@ -175,7 +175,11 @@ impl App {
                 initial_exp_cache.clone(),
                 config.ui.tz(),
             )),
-            Box::new(ExperimentsTab::new(client.clone(), initial_exp_cache, config.ui.tz())),
+            Box::new(ExperimentsTab::new(
+                client.clone(),
+                initial_exp_cache,
+                config.ui.tz(),
+            )),
             Box::new(ComputeTab::new(
                 client,
                 refresh_interval,

@@ -5,6 +5,10 @@ on:
     branches: [main]
     paths:
       - "docs/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - "docs/**"
   workflow_dispatch:
 
 permissions:
@@ -13,8 +17,8 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
-  cancel-in-progress: false
+  group: pages-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -28,9 +32,6 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
 
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
-
       - name: Install dependencies
         run: bun install
         working-directory: docs
@@ -40,11 +41,13 @@ jobs:
         working-directory: docs
 
       - name: Upload artifact
+        if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v3
         with:
           path: docs/.vitepress/dist
 
   deploy:
+    if: github.event_name != 'pull_request'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

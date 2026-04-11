@@ -9,7 +9,7 @@ use crate::components::workspace_picker::centered_rect;
 use crate::theme::Theme;
 
 /// Column visibility/ordering picker modal.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct ColumnPicker {
     pub active: bool,
     pub columns: Vec<ColumnEntry>,
@@ -31,14 +31,7 @@ pub struct ColumnEntry {
 
 impl ColumnPicker {
     pub fn new() -> Self {
-        Self {
-            active: false,
-            columns: Vec::new(),
-            state: ListState::default(),
-            moving: None,
-            changed: false,
-            save_requested: false,
-        }
+        Self::default()
     }
 
     pub fn open(&mut self, columns: Vec<ColumnEntry>) {

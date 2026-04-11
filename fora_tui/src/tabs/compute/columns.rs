@@ -7,20 +7,9 @@ use super::state::ComputeRow;
 
 pub fn default_columns() -> Vec<ColumnDef<ComputeRow>> {
     vec![
-        ColumnDef::new(
-            "name",
-            "Name",
-            |r: &ComputeRow| r.name.clone(),
-            20,
-        )
-        .with_min_width(8),
-        ColumnDef::new(
-            "type",
-            "Type",
-            |r: &ComputeRow| r.compute_type.clone(),
-            16,
-        )
-        .with_min_width(6),
+        ColumnDef::new("name", "Name", |r: &ComputeRow| r.name.clone(), 20).with_min_width(8),
+        ColumnDef::new("type", "Type", |r: &ComputeRow| r.compute_type.clone(), 16)
+            .with_min_width(6),
         ColumnDef::new(
             "vm_size",
             "VM Size",

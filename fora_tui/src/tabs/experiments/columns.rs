@@ -51,13 +51,8 @@ pub fn job_columns(tz: chrono_tz::Tz) -> Vec<ColumnDef<RecentJobRow>> {
         )
         .hidden()
         .with_min_width(10),
-        ColumnDef::new(
-            "id",
-            "Job ID",
-            |r: &RecentJobRow| r.id.clone(),
-            20,
-        )
-        .hidden()
-        .with_min_width(8),
+        ColumnDef::new("id", "Job ID", |r: &RecentJobRow| r.id.clone(), 20)
+            .hidden()
+            .with_min_width(8),
     ]
 }
