@@ -55,7 +55,11 @@ pub struct ExperimentsTab {
 }
 
 impl ExperimentsTab {
-    pub fn new(client: Option<AzureClient>, experiment_cache: HashMap<String, String>, tz: chrono_tz::Tz) -> Self {
+    pub fn new(
+        client: Option<AzureClient>,
+        experiment_cache: HashMap<String, String>,
+        tz: chrono_tz::Tz,
+    ) -> Self {
         let mut table_state = TableState::default();
         table_state.select(Some(0));
 
@@ -515,9 +519,11 @@ impl Tab for ExperimentsTab {
 
             // Extract job data to avoid borrow conflict with detail_pane
             let job_data = self.selected_job().map(|job| {
-                let created = job
-                    .start_time
-                    .map(|t| t.with_timezone(&self.tz).format("%Y-%m-%d %H:%M:%S %Z").to_string());
+                let created = job.start_time.map(|t| {
+                    t.with_timezone(&self.tz)
+                        .format("%Y-%m-%d %H:%M:%S %Z")
+                        .to_string()
+                });
                 let runtime = crate::format::format_runtime(job.start_time, job.end_time);
                 (
                     job.id.clone(),
@@ -681,7 +687,11 @@ impl ExperimentsTab {
                     };
                     let recent = exp
                         .most_recent_job_time
-                        .map(|t| t.with_timezone(&self.tz).format("%Y-%m-%d %H:%M").to_string())
+                        .map(|t| {
+                            t.with_timezone(&self.tz)
+                                .format("%Y-%m-%d %H:%M")
+                                .to_string()
+                        })
                         .unwrap_or_default();
 
                     // Experiment header: bold name in first cell, last activity in last cell

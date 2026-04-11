@@ -447,9 +447,7 @@ pub async fn enrich_jobs(
                             let end_time = if matches!(
                                 status,
                                 Some(
-                                    JobStatus::Completed
-                                        | JobStatus::Failed
-                                        | JobStatus::Canceled
+                                    JobStatus::Completed | JobStatus::Failed | JobStatus::Canceled
                                 )
                             ) {
                                 match enrich_client.mlflow().get_run(&id).await {
@@ -509,6 +507,7 @@ fn extract_compute(compute_id: &Option<String>) -> Option<String> {
 /// 3. Re-enriches active (non-terminal) jobs to pick up status changes
 /// 4. Refreshes start_time for active jobs that have no start_time yet via MLflow get_run
 /// 5. Enriches any new jobs found
+#[allow(clippy::too_many_arguments)]
 pub fn spawn_incremental_refresh(
     client: AzureClient,
     username: String,

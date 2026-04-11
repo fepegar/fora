@@ -111,10 +111,7 @@ pub fn render_table<T>(
 }
 
 /// Determine which columns fit in the available width, cropping from the right.
-fn get_visible_columns<'a, T>(
-    columns: &'a [ColumnDef<T>],
-    available_width: u16,
-) -> Vec<&'a ColumnDef<T>> {
+fn get_visible_columns<T>(columns: &[ColumnDef<T>], available_width: u16) -> Vec<&ColumnDef<T>> {
     let mut sorted: Vec<&ColumnDef<T>> = columns.iter().filter(|c| c.visible).collect();
     sorted.sort_by_key(|c| c.order);
 
@@ -198,7 +195,7 @@ impl ListState {
 
 /// Apply saved column config (ordering + visibility) to column definitions.
 /// Listed column IDs are visible in that order; unlisted columns are hidden and appended at the end.
-pub fn apply_column_config<T>(columns: &mut Vec<ColumnDef<T>>, config: Option<&[String]>) {
+pub fn apply_column_config<T>(columns: &mut [ColumnDef<T>], config: Option<&[String]>) {
     let Some(visible_ids) = config else {
         for (i, col) in columns.iter_mut().enumerate() {
             col.order = i;
@@ -220,7 +217,7 @@ pub fn apply_column_config<T>(columns: &mut Vec<ColumnDef<T>>, config: Option<&[
             col.visible = true;
         } else {
             // Not in config list — hidden, placed after visible columns
-            col.order = visible_count + col.order;
+            col.order += visible_count;
             col.visible = false;
         }
     }

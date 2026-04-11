@@ -451,9 +451,11 @@ impl Tab for RecentJobsTab {
 
             // Extract job data to avoid borrow conflict with detail_pane
             let job_data = self.selected_job().map(|job| {
-                let created = job
-                    .start_time
-                    .map(|t| t.with_timezone(&self.tz).format("%Y-%m-%d %H:%M:%S %Z").to_string());
+                let created = job.start_time.map(|t| {
+                    t.with_timezone(&self.tz)
+                        .format("%Y-%m-%d %H:%M:%S %Z")
+                        .to_string()
+                });
                 let runtime = crate::format::format_runtime(job.start_time, job.end_time);
                 (
                     job.id.clone(),
