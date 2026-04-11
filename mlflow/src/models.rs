@@ -212,3 +212,8 @@ pub struct SearchRunsResponse {
     #[serde(alias = "nextPageToken")]
     pub next_page_token: Option<String>,
 }
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct GetRunResponse {
+    pub run: Run,
+}

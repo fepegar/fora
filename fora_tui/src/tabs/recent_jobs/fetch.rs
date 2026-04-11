@@ -420,17 +420,29 @@ pub fn spawn_incremental_refresh(
                     if cancel.is_cancelled() {
                         return;
                     }
-                    // Only keep runs newer than our latest known start_time
-                    let new_runs: Vec<RecentJobRow> = response
-                        .runs
-                        .iter()
-                        .map(|run| map_run_to_row(run, &exp_names))
-                        .filter(|row| {
-                            row.start_time
-                                .map(|st| st > latest_start_time)
-                                .unwrap_or(false)
-                        })
-                        .collect();
+                    let mut new_runs = Vec::new();
+                    for run in &response.runs {
+                        let row = map_run_to_row(run, &exp_names);
+                        let is_new = row
+                            .start_time
+                            .map(|st| st > latest_start_time)
+                            .unwrap_or(false);
+
+                        if is_new {
+                            new_runs.push(row);
+                        } else {
+                            // Existing run — send updated metric_keys so the UI
+                            // picks up any metrics logged since the initial fetch
+                            let metric_keys: Vec<String> =
+                                run.data.metrics.iter().map(|m| m.key.clone()).collect();
+                            if !metric_keys.is_empty() {
+                                let _ = action_tx.send(Action::MetricKeysUpdated {
+                                    job_id: row.id,
+                                    metric_keys,
+                                });
+                            }
+                        }
+                    }
 
                     if !new_runs.is_empty() {
                         let _ =

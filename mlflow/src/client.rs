@@ -5,8 +5,8 @@ use azure_core::credentials::TokenCredential;
 use reqwest::Client;
 
 use crate::models::{
-    GetMetricHistoryResponse, SearchExperimentsRequest, SearchExperimentsResponse,
-    SearchRunsRequest, SearchRunsResponse,
+    GetMetricHistoryResponse, GetRunResponse, SearchExperimentsRequest,
+    SearchExperimentsResponse, SearchRunsRequest, SearchRunsResponse,
 };
 
 const MLFLOW_TOKEN_SCOPE: &str = "https://ml.azure.com/.default";
@@ -138,6 +138,34 @@ impl MlflowClient {
         resp.json::<SearchRunsResponse>()
             .await
             .context("Failed to parse runs/search response")
+    }
+
+    /// Get a single run by ID, returning its full data including current metrics.
+    pub async fn get_run(&self, run_id: &str) -> Result<crate::models::Run> {
+        let url = format!("{}/runs/get", self.base_url);
+
+        let token = self.get_token().await?;
+        let resp = self
+            .http
+            .get(&url)
+            .bearer_auth(&token)
+            .query(&[("run_id", run_id)])
+            .send()
+            .await
+            .context("MLflow runs/get request failed")?;
+
+        let status = resp.status();
+        if !status.is_success() {
+            let text = resp.text().await.unwrap_or_default();
+            anyhow::bail!("MLflow runs/get returned {}: {}", status, text);
+        }
+
+        let response: GetRunResponse = resp
+            .json()
+            .await
+            .context("Failed to parse runs/get response")?;
+
+        Ok(response.run)
     }
 
     /// Get metric history for a single metric key on a run.

@@ -144,6 +144,11 @@ impl DetailPane {
         self.current_run_id = None;
     }
 
+    /// Clear the metrics cache so the next visit to the Metrics tab re-fetches.
+    pub fn invalidate_metrics_cache(&mut self) {
+        self.metrics_cache.clear();
+    }
+
     /// Update metrics state from an action.
     pub fn handle_action(&mut self, action: &Action) {
         match action {
@@ -284,10 +289,6 @@ impl DetailPane {
 
     /// Check if metrics need fetching for the current run.
     fn maybe_fetch_metrics(&mut self, run_id: &str, metric_keys: &[String]) -> DetailKeyResult {
-        if metric_keys.is_empty() {
-            return DetailKeyResult::Consumed;
-        }
-
         match self.metrics_cache.get(run_id) {
             Some(MetricsState::Loaded(_))
             | Some(MetricsState::Loading)
@@ -713,6 +714,10 @@ fn make_metric_series(key: String, points: Vec<(f64, f64)>) -> MetricSeries {
 /// a `MetricBatchLoaded` action as soon as its history is ready, so
 /// charts appear progressively rather than waiting for all metrics.
 /// All metrics are fetched concurrently for faster loading.
+///
+/// The passed-in `metric_keys` are used as a hint. If empty, the fetcher
+/// calls MLflow's `get_run` endpoint to discover the current metric keys,
+/// ensuring newly-logged metrics are always picked up.
 pub fn spawn_metrics_fetcher(
     client: AzureClient,
     run_id: String,
@@ -721,9 +726,32 @@ pub fn spawn_metrics_fetcher(
 ) {
     tokio::spawn(async move {
         let mlflow = client.mlflow().clone();
+
+        // Discover metric keys: use the passed-in list if available,
+        // otherwise query MLflow for the current set.
+        let keys = if metric_keys.is_empty() {
+            match mlflow.get_run(&run_id).await {
+                Ok(run) => run.data.metrics.iter().map(|m| m.key.clone()).collect(),
+                Err(e) => {
+                    let _ = action_tx.send(Action::MetricsFetchFailed {
+                        run_id,
+                        error: format!("Failed to get run: {}", e),
+                    });
+                    return;
+                }
+            }
+        } else {
+            metric_keys
+        };
+
+        if keys.is_empty() {
+            let _ = action_tx.send(Action::MetricsFetchComplete { run_id });
+            return;
+        }
+
         let mut set = tokio::task::JoinSet::new();
 
-        for key in metric_keys {
+        for key in keys {
             let mlflow = mlflow.clone();
             let run_id = run_id.clone();
             let action_tx = action_tx.clone();

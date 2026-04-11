@@ -77,6 +77,12 @@ pub enum Action {
     // Compute tab
     ComputeLoaded(Vec<ComputeRow>),
 
+    // Metric keys updated for an existing run (e.g. new metrics logged after initial fetch)
+    MetricKeysUpdated {
+        job_id: String,
+        metric_keys: Vec<String>,
+    },
+
     // Metrics (detail pane)
     MetricBatchLoaded {
         run_id: String,

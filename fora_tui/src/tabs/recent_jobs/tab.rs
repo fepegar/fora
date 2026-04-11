@@ -296,6 +296,25 @@ impl Tab for RecentJobsTab {
                     self.all_jobs = merged;
                     self.apply_filter();
                 }
+                // Invalidate cached metrics so refreshed data is shown
+                self.detail_pane.invalidate_metrics_cache();
+            }
+            Action::MetricKeysUpdated {
+                job_id,
+                metric_keys,
+            } => {
+                for job in self
+                    .all_jobs
+                    .iter_mut()
+                    .chain(self.filtered_jobs.iter_mut())
+                {
+                    if job.id == *job_id && job.metric_keys != *metric_keys {
+                        job.metric_keys = metric_keys.clone();
+                        // Invalidate cached metrics for this run so re-opening
+                        // the Metrics tab will fetch the new set
+                        self.detail_pane.invalidate_metrics_cache();
+                    }
+                }
             }
             Action::RecentJobsFetchComplete => {
                 self.fetch_state = FetchState::Complete;

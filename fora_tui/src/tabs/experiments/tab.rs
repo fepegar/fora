@@ -432,6 +432,9 @@ impl Tab for ExperimentsTab {
                 }
             }
             Action::ExperimentIncrementalUpdate(entries) => {
+                // Invalidate cached metrics — the user expects fresh data after refresh
+                self.detail_pane.invalidate_metrics_cache();
+
                 for (exp_id, exp_name, most_recent_time) in entries {
                     if let Some(exp) = self
                         .experiments
@@ -477,6 +480,19 @@ impl Tab for ExperimentsTab {
             }
             Action::ExperimentCacheUpdated(cache) => {
                 self.experiment_cache = cache.clone();
+            }
+            Action::MetricKeysUpdated {
+                job_id,
+                metric_keys,
+            } => {
+                for exp in &mut self.experiments {
+                    for job in &mut exp.jobs {
+                        if job.id == *job_id && job.metric_keys != *metric_keys {
+                            job.metric_keys = metric_keys.clone();
+                            self.detail_pane.invalidate_metrics_cache();
+                        }
+                    }
+                }
             }
             Action::MetricBatchLoaded { .. }
             | Action::MetricsFetchComplete { .. }

@@ -335,15 +335,24 @@ pub fn spawn_incremental_experiment_refresh(
 
                     // Only consider runs newer than our latest known time
                     let is_new = start_time.map(|st| st > latest_start_time).unwrap_or(false);
-                    if !is_new {
-                        continue;
-                    }
-
-                    let entry = experiment_updates
-                        .entry(run.info.experiment_id.clone())
-                        .or_insert(None);
-                    if let Some(st) = start_time {
-                        *entry = Some(entry.map(|cur| cur.max(st)).unwrap_or(st));
+                    if is_new {
+                        let entry = experiment_updates
+                            .entry(run.info.experiment_id.clone())
+                            .or_insert(None);
+                        if let Some(st) = start_time {
+                            *entry = Some(entry.map(|cur| cur.max(st)).unwrap_or(st));
+                        }
+                    } else {
+                        // Existing run — send updated metric_keys so the UI
+                        // picks up any metrics logged since the initial fetch
+                        let metric_keys: Vec<String> =
+                            run.data.metrics.iter().map(|m| m.key.clone()).collect();
+                        if !metric_keys.is_empty() {
+                            let _ = action_tx.send(Action::MetricKeysUpdated {
+                                job_id: run.info.run_id.clone(),
+                                metric_keys,
+                            });
+                        }
                     }
                 }
 
