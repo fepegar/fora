@@ -37,6 +37,7 @@ export default defineConfig({
     nav: [
       { text: "Getting Started", link: "/installation" },
       { text: "CLI Reference", link: "/cli/" },
+      { text: "Guides", link: "/example" },
     ],
 
     sidebar: [
@@ -53,7 +54,12 @@ export default defineConfig({
           { text: "Overview", link: "/cli/" },
           { text: "fora", link: "/cli/tui" },
           { text: "fora init", link: "/cli/init" },
+          { text: "fora submit", link: "/cli/submit" },
         ],
+      },
+      {
+        text: "Guides",
+        items: [{ text: "Example: Submitting a Job", link: "/example" }],
       },
     ],
 

@@ -1,0 +1,7 @@
+[project]
+name = "example"
+version = "0.1.0"
+description = "Example folder to submit to Azure ML"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = []

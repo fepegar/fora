@@ -18,3 +18,4 @@ fora <command> [options]
 |---------|-------------|
 | [`fora`](./tui) | Start the interactive terminal UI |
 | [`fora init`](./init) | Interactively set up a configuration file |
+| [`fora submit`](./submit) | Submit a job to Azure ML |

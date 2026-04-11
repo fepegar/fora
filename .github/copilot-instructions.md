@@ -33,7 +33,7 @@ Fora is a Cargo workspace with four crates for managing Azure Machine Learning w
 
 - **`fora_tui`** — Terminal UI built with ratatui + crossterm. Depends on `azure_ml` and `mlflow`.
 
-- **`fora_cli`** — CLI tool (binary name: `fora`) built with clap. Depends on both `azure_ml` and `fora_tui`. Provides the `init` command for interactive configuration setup and launches the TUI by default.
+- **`fora_cli`** — CLI tool (binary name: `fora`) built with clap. Depends on both `azure_ml` and `fora_tui`. Handles job submission: code upload, environment creation, and job creation against Azure ML.
 
 ### TUI Architecture (`fora_tui`)
 
@@ -57,9 +57,14 @@ Key modules:
 
 ### CLI Architecture (`fora_cli`)
 
-The CLI provides two modes:
-- **Default (no subcommand)**: Launches the TUI. If no config exists, runs the init wizard first.
-- **`fora init`**: Interactive configuration wizard that discovers Azure ML workspaces and generates a TOML config file.
+The `submit` command orchestrates:
+1. **Code upload** (`code.rs`): Walks source directory (respects `.gitignore` via `ignore` crate), uploads files concurrently to Azure Blob Storage (semaphore-limited to 128 concurrent uploads).
+2. **Environment creation** (`env.rs`): Hashes `pyproject.toml` + `uv.lock` + `.python-version` + config with `blake3` to produce a deterministic environment name. Builds a Dockerfile using `uv` for dependency management.
+3. **Job submission** (`submit.rs`): Code upload and environment creation run concurrently via `futures::join!`, then a `CommandJob` is submitted.
+
+Supporting modules:
+- `inputs.rs` — Parses and resolves data asset and datastore input mounts for job submission.
+- `settings.rs` — Parses `NAME=VALUE` environment variable arguments.
 
 ## Key Conventions
 
@@ -69,4 +74,5 @@ The CLI provides two modes:
 - **Async runtime**: Tokio with `features = ["full"]`. Background work uses `tokio::spawn`; blocking operations use `tokio::task::spawn_blocking`.
 - **Configuration**: TOML files loaded from `./fora.toml` (local) or `~/.config/fora.toml` (global). Workspaces are configured with `name`, `subscription_id`, `resource_group`, `workspace_name`, and `region` (used for the MLflow API endpoint). Logging controlled via `RUST_LOG` env var.
 - **New tabs**: Implement the `Tab` trait, add to the tab list in `app.rs`, and define an `Action` variant for data events.
-- **Documentation**: When making changes to CLI commands, configuration options, or user-facing behaviour, update the corresponding VitePress docs in `docs/`. Key pages: `docs/setup.md` (config reference), `docs/cli/index.md` (CLI overview).
+- **`example/` directory**: A sample Python project for testing `fora submit`. Uses `uv` as the package manager with a Dockerfile template.
+- **Documentation**: When making changes to CLI commands, configuration options, or user-facing behaviour, update the corresponding VitePress docs in `docs/`. Key pages: `docs/setup.md` (config reference), `docs/cli/submit.md` (CLI flags), `docs/cli/index.md` (CLI overview), `docs/example.md` (submission walkthrough).

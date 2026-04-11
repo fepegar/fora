@@ -4,8 +4,15 @@ use fora_tui::config::AppConfig;
 use tracing_subscriber::EnvFilter;
 
 mod cli;
+mod code;
+mod env;
 mod init;
+mod inputs;
+mod settings;
+mod submit;
+mod utils;
 use cli::{Cli, Command};
+use submit::submit_to_azure;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -16,6 +23,9 @@ async fn main() -> Result<()> {
     let args = Cli::parse();
 
     match args.command {
+        Some(Command::Submit(args)) => {
+            submit_to_azure(&args).await?;
+        }
         Some(Command::Init) => {
             init::run_init_wizard().await?;
         }
