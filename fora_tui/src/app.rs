@@ -55,6 +55,15 @@ pub enum Action {
     // Incremental refresh for Recent Jobs
     RecentJobsIncrementalBatch(Vec<RecentJobRow>),
 
+    // Pending/scheduled jobs (fetched separately to avoid pagination through all jobs)
+    RecentJobsPendingBatch(Vec<RecentJobRow>),
+
+    // Start time updated for a job that transitioned from pending to running
+    RecentJobStartTimeUpdated {
+        job_id: String,
+        start_time: DateTime<Utc>,
+    },
+
     // Experiment cache (shared by Recent Jobs and Experiments tabs)
     ExperimentCacheUpdated(HashMap<String, String>),
 

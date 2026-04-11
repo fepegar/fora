@@ -16,7 +16,9 @@ use crate::components::detail_pane::{self, DetailKeyResult, DetailPane};
 use crate::components::job_detail::JobDetail;
 use crate::components::search_bar::SearchBar;
 use crate::components::spinner::Spinner;
-use crate::tabs::{is_active_status, is_job_cancelable, spawn_cancel_job, ActionSender, Tab};
+use crate::tabs::{
+    is_active_status, is_job_cancelable, is_pre_running_status, spawn_cancel_job, ActionSender, Tab,
+};
 use crate::theme;
 use crate::widgets::table::{self, ListState};
 
@@ -148,6 +150,14 @@ impl RecentJobsTab {
             .map(|j| j.id.clone())
             .collect();
 
+        // Collect IDs of jobs with no start_time that need start_time refresh
+        let pending_job_ids: Vec<String> = self
+            .all_jobs
+            .iter()
+            .filter(|j| j.start_time.is_none() && is_active_status(&j.status))
+            .map(|j| j.id.clone())
+            .collect();
+
         fetch::spawn_incremental_refresh(
             client,
             self.username.clone(),
@@ -156,6 +166,7 @@ impl RecentJobsTab {
             self.experiment_cache.clone(),
             latest,
             active_job_ids,
+            pending_job_ids,
         );
     }
 
@@ -166,6 +177,19 @@ impl RecentJobsTab {
                     Some(self.latest_start_time.map(|cur| cur.max(st)).unwrap_or(st));
             }
         }
+    }
+
+    /// Sorts all_jobs so that jobs with no start_time appear first (pending/scheduled),
+    /// followed by jobs sorted by start_time descending (most recent first).
+    fn sort_jobs(&mut self) {
+        self.all_jobs.sort_by(|a, b| {
+            match (a.start_time, b.start_time) {
+                (None, None) => std::cmp::Ordering::Equal,
+                (None, Some(_)) => std::cmp::Ordering::Less, // None goes first (top)
+                (Some(_), None) => std::cmp::Ordering::Greater,
+                (Some(a_time), Some(b_time)) => b_time.cmp(&a_time), // DESC
+            }
+        });
     }
 }
 
@@ -279,7 +303,45 @@ impl Tab for RecentJobsTab {
             Action::RecentJobsBatchLoaded(rows) => {
                 self.all_jobs.extend(rows.iter().cloned());
                 self.update_latest_start_time(rows);
+                self.sort_jobs();
                 self.apply_filter();
+            }
+            Action::RecentJobsPendingBatch(rows) => {
+                // Deduplicate: only add jobs not already in all_jobs
+                let new_rows: Vec<_> = rows
+                    .iter()
+                    .filter(|r| !self.all_jobs.iter().any(|j| j.id == r.id))
+                    .cloned()
+                    .collect();
+                if !new_rows.is_empty() {
+                    self.all_jobs.extend(new_rows);
+                    self.sort_jobs();
+                    self.apply_filter();
+                }
+            }
+            Action::RecentJobStartTimeUpdated { job_id, start_time } => {
+                let mut changed = false;
+                for job in &mut self.all_jobs {
+                    if job.id == *job_id && job.start_time.is_none() {
+                        job.start_time = Some(*start_time);
+                        self.latest_start_time = Some(
+                            self.latest_start_time
+                                .map(|cur| cur.max(*start_time))
+                                .unwrap_or(*start_time),
+                        );
+                        changed = true;
+                    }
+                }
+                if changed {
+                    // Update filtered_jobs too
+                    for job in &mut self.filtered_jobs {
+                        if job.id == *job_id {
+                            job.start_time = Some(*start_time);
+                        }
+                    }
+                    self.sort_jobs();
+                    self.apply_filter();
+                }
             }
             Action::RecentJobsIncrementalBatch(rows) => {
                 // Deduplicate: only prepend jobs not already in all_jobs
@@ -290,10 +352,8 @@ impl Tab for RecentJobsTab {
                     .collect();
                 if !new_rows.is_empty() {
                     self.update_latest_start_time(&new_rows);
-                    // Prepend new jobs at the top (most recent first)
-                    let mut merged = new_rows;
-                    merged.append(&mut self.all_jobs);
-                    self.all_jobs = merged;
+                    self.all_jobs.extend(new_rows);
+                    self.sort_jobs();
                     self.apply_filter();
                 }
                 // Invalidate cached metrics so refreshed data is shown
@@ -330,12 +390,22 @@ impl Tab for RecentJobsTab {
                 status,
                 end_time,
             } => {
+                let mut needs_resort = false;
                 for job in self
                     .all_jobs
                     .iter_mut()
                     .chain(self.filtered_jobs.iter_mut())
                 {
                     if job.id == *job_id {
+                        // Detect transition from pre-running to running+ (needs re-sort)
+                        if let Some(new_status) = status {
+                            let was_pre_running = is_pre_running_status(&job.status);
+                            let is_now_running = !is_pre_running_status(new_status);
+                            if was_pre_running && is_now_running {
+                                needs_resort = true;
+                            }
+                        }
+
                         job.compute_target = compute_target.clone();
                         job.job_type = job_type.clone();
                         job.command = command.clone();
@@ -350,6 +420,10 @@ impl Tab for RecentJobsTab {
                         }
                         job.enriched = true;
                     }
+                }
+                if needs_resort {
+                    self.sort_jobs();
+                    self.apply_filter();
                 }
             }
             Action::ExperimentCacheUpdated(cache) => {

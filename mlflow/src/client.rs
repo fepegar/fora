@@ -5,8 +5,8 @@ use azure_core::credentials::TokenCredential;
 use reqwest::Client;
 
 use crate::models::{
-    GetMetricHistoryResponse, GetRunResponse, SearchExperimentsRequest,
-    SearchExperimentsResponse, SearchRunsRequest, SearchRunsResponse,
+    GetMetricHistoryResponse, GetRunResponse, SearchExperimentsRequest, SearchExperimentsResponse,
+    SearchRunsRequest, SearchRunsResponse,
 };
 
 const MLFLOW_TOKEN_SCOPE: &str = "https://ml.azure.com/.default";

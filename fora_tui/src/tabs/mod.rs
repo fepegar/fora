@@ -30,6 +30,18 @@ pub fn is_job_cancelable(status: &JobStatus) -> bool {
     )
 }
 
+/// Check whether a job status indicates the job hasn't started running yet.
+pub fn is_pre_running_status(status: &JobStatus) -> bool {
+    matches!(
+        status,
+        JobStatus::Queued
+            | JobStatus::Starting
+            | JobStatus::Preparing
+            | JobStatus::NotStarted
+            | JobStatus::Provisioning
+    )
+}
+
 /// Check whether a job status is non-terminal (job may still change).
 pub fn is_active_status(status: &JobStatus) -> bool {
     !matches!(
