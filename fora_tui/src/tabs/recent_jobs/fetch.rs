@@ -443,6 +443,35 @@ pub async fn enrich_jobs(
                                 ),
                                 _ => (None, None, None, None, None, HashMap::new(), None),
                             };
+                            // If the job reached a terminal state, fetch end_time from MLflow
+                            let end_time = if matches!(
+                                status,
+                                Some(
+                                    JobStatus::Completed
+                                        | JobStatus::Failed
+                                        | JobStatus::Canceled
+                                )
+                            ) {
+                                match enrich_client.mlflow().get_run(&id).await {
+                                    Ok(run) => run
+                                        .info
+                                        .end_time
+                                        .as_deref()
+                                        .and_then(|s| s.parse::<i64>().ok())
+                                        .and_then(DateTime::from_timestamp_millis),
+                                    Err(e) => {
+                                        tracing::debug!(
+                                            "Failed to fetch end_time for terminal job {}: {}",
+                                            id,
+                                            e
+                                        );
+                                        None
+                                    }
+                                }
+                            } else {
+                                None
+                            };
+
                             let _ = tx.send(Action::RecentJobEnriched {
                                 job_id,
                                 compute_target: compute,
@@ -452,7 +481,7 @@ pub async fn enrich_jobs(
                                 description: desc,
                                 tags,
                                 status,
-                                end_time: None,
+                                end_time,
                             });
                         }
                     }
