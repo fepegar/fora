@@ -1,5 +1,8 @@
 # Fora
 
+> [!WARNING]
+> Fora is actively in development. Expect breaking changes, incomplete features, and rough edges.
+
 Azure ML from your terminal.
 
 Fora is a terminal UI for managing [Azure Machine Learning](https://azure.microsoft.com/en-us/products/machine-learning) workspaces. Browse jobs, experiments, and compute in an interactive TUI.

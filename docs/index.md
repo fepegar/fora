@@ -27,3 +27,7 @@ features:
     icon: ⚙️
     details: Simple TOML-based configuration for workspaces, UI preferences, and column layouts.
 ---
+
+::: warning 🚧 Active Development
+Fora is actively in development. Expect breaking changes, incomplete features, and rough edges.
+:::
