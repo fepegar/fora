@@ -174,11 +174,13 @@ impl App {
                 config.columns.jobs.as_deref(),
                 initial_exp_cache.clone(),
                 config.ui.tz(),
+                refresh_interval,
             )),
             Box::new(ExperimentsTab::new(
                 client.clone(),
                 initial_exp_cache,
                 config.ui.tz(),
+                refresh_interval,
             )),
             Box::new(ComputeTab::new(
                 client,
@@ -425,8 +427,14 @@ impl App {
                             self.config.columns.jobs.as_deref(),
                             exp_cache.clone(),
                             tz,
+                            refresh,
                         )),
-                        Box::new(ExperimentsTab::new(Some(client.clone()), exp_cache, tz)),
+                        Box::new(ExperimentsTab::new(
+                            Some(client.clone()),
+                            exp_cache,
+                            tz,
+                            refresh,
+                        )),
                         Box::new(ComputeTab::new(
                             Some(client),
                             refresh,
