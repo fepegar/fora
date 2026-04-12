@@ -1,11 +1,13 @@
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::Duration;
 
 use chrono::{DateTime, Utc};
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::widgets::{Block, Borders};
 use ratatui::Frame;
+use tokio::time::Instant;
 use tokio_util::sync::CancellationToken;
 
 use crate::app::Action;
@@ -48,6 +50,8 @@ pub struct RecentJobsTab {
     /// The latest start_time seen across all loaded jobs, for incremental refresh.
     latest_start_time: Option<DateTime<Utc>>,
     tz: chrono_tz::Tz,
+    refresh_interval: Duration,
+    last_refreshed: Option<Instant>,
 }
 
 impl RecentJobsTab {
@@ -57,6 +61,7 @@ impl RecentJobsTab {
         column_config: Option<&[String]>,
         experiment_cache: HashMap<String, String>,
         tz: chrono_tz::Tz,
+        refresh_interval: u64,
     ) -> Self {
         let mut columns = default_columns(tz);
         table::apply_column_config(&mut columns, column_config);
@@ -80,6 +85,8 @@ impl RecentJobsTab {
             pending_cancel_job_id: None,
             latest_start_time: None,
             tz,
+            refresh_interval: Duration::from_secs(refresh_interval),
+            last_refreshed: None,
         }
     }
 
@@ -381,6 +388,7 @@ impl Tab for RecentJobsTab {
             }
             Action::RecentJobsFetchComplete => {
                 self.fetch_state = FetchState::Complete;
+                self.last_refreshed = Some(Instant::now());
             }
             Action::RecentJobEnriched {
                 job_id,
@@ -523,6 +531,12 @@ impl Tab for RecentJobsTab {
 
         if self.fetch_state == FetchState::Idle {
             self.start_fetch(action_tx);
+        } else if self.fetch_state == FetchState::Complete {
+            if let Some(last) = self.last_refreshed {
+                if last.elapsed() >= self.refresh_interval {
+                    self.start_incremental_refresh(action_tx);
+                }
+            }
         }
     }
 

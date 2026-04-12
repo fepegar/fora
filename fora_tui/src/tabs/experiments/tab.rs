@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::Duration;
 
 use chrono::{DateTime, Utc};
 use crossterm::event::{KeyCode, KeyEvent};
@@ -8,6 +9,7 @@ use ratatui::style::{Modifier, Style};
 use ratatui::text::Span;
 use ratatui::widgets::{Block, Borders, Row, Table, TableState};
 use ratatui::Frame;
+use tokio::time::Instant;
 use tokio_util::sync::CancellationToken;
 
 use crate::app::Action;
@@ -52,6 +54,8 @@ pub struct ExperimentsTab {
     /// The latest start_time seen across all experiments, for incremental refresh.
     latest_start_time: Option<DateTime<Utc>>,
     tz: chrono_tz::Tz,
+    refresh_interval: Duration,
+    last_refreshed: Option<Instant>,
 }
 
 impl ExperimentsTab {
@@ -59,6 +63,7 @@ impl ExperimentsTab {
         client: Option<AzureClient>,
         experiment_cache: HashMap<String, String>,
         tz: chrono_tz::Tz,
+        refresh_interval: u64,
     ) -> Self {
         let mut table_state = TableState::default();
         table_state.select(Some(0));
@@ -89,6 +94,8 @@ impl ExperimentsTab {
             discovery_progress: (0, 0),
             latest_start_time: None,
             tz,
+            refresh_interval: Duration::from_secs(refresh_interval),
+            last_refreshed: None,
         }
     }
 
@@ -390,6 +397,7 @@ impl Tab for ExperimentsTab {
                 self.rebuild_flat_list();
                 self.update_latest_start_time_from_experiments();
                 self.discovery_state = DiscoveryState::Complete;
+                self.last_refreshed = Some(Instant::now());
             }
             Action::ExperimentJobsLoaded {
                 experiment_id,
@@ -483,6 +491,7 @@ impl Tab for ExperimentsTab {
             }
             Action::ExperimentIncrementalComplete => {
                 self.discovery_state = DiscoveryState::Complete;
+                self.last_refreshed = Some(Instant::now());
             }
             Action::ExperimentCacheUpdated(cache) => {
                 self.experiment_cache = cache.clone();
@@ -589,6 +598,12 @@ impl Tab for ExperimentsTab {
 
         if self.discovery_state == DiscoveryState::Idle {
             self.start_discovery(action_tx);
+        } else if self.discovery_state == DiscoveryState::Complete {
+            if let Some(last) = self.last_refreshed {
+                if last.elapsed() >= self.refresh_interval {
+                    self.start_incremental_refresh(action_tx);
+                }
+            }
         }
     }
 
