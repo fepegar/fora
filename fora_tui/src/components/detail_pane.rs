@@ -109,6 +109,10 @@ pub struct DetailPane {
     metrics_scroll: u16,
     metrics_total_height: u16,
     metrics_visible_height: u16,
+    /// Index of the currently selected metric graph.
+    selected_metric_index: usize,
+    /// Number of metric series currently available (for clamping).
+    metrics_count: usize,
     /// Cached metrics per run_id.
     metrics_cache: HashMap<String, MetricsState>,
     /// The run_id currently displayed.
@@ -125,6 +129,8 @@ impl Default for DetailPane {
             metrics_scroll: 0,
             metrics_total_height: 0,
             metrics_visible_height: 0,
+            selected_metric_index: 0,
+            metrics_count: 0,
             metrics_cache: HashMap::new(),
             current_run_id: None,
         }
@@ -141,6 +147,8 @@ impl DetailPane {
         self.active_tab = DetailTab::Info;
         self.info_scroll = 0;
         self.metrics_scroll = 0;
+        self.selected_metric_index = 0;
+        self.metrics_count = 0;
         self.current_run_id = None;
     }
 
@@ -249,7 +257,7 @@ impl DetailPane {
                 self.info_scroll = self.info_scroll.saturating_sub(1);
             }
             DetailTab::Metrics => {
-                self.metrics_scroll = self.metrics_scroll.saturating_sub(1);
+                self.selected_metric_index = self.selected_metric_index.saturating_sub(1);
             }
         }
     }
@@ -260,7 +268,10 @@ impl DetailPane {
                 self.info_scroll = self.info_scroll.saturating_add(1);
             }
             DetailTab::Metrics => {
-                self.metrics_scroll = self.metrics_scroll.saturating_add(1);
+                if self.metrics_count > 0 {
+                    self.selected_metric_index =
+                        (self.selected_metric_index + 1).min(self.metrics_count - 1);
+                }
             }
         }
     }
@@ -268,7 +279,7 @@ impl DetailPane {
     fn scroll_to_top(&mut self) {
         match self.active_tab {
             DetailTab::Info => self.info_scroll = 0,
-            DetailTab::Metrics => self.metrics_scroll = 0,
+            DetailTab::Metrics => self.selected_metric_index = 0,
         }
     }
 
@@ -280,9 +291,9 @@ impl DetailPane {
                     .saturating_sub(self.info_visible_height);
             }
             DetailTab::Metrics => {
-                self.metrics_scroll = self
-                    .metrics_total_height
-                    .saturating_sub(self.metrics_visible_height);
+                if self.metrics_count > 0 {
+                    self.selected_metric_index = self.metrics_count - 1;
+                }
             }
         }
     }
@@ -539,6 +550,12 @@ impl DetailPane {
         series: &[MetricSeries],
         still_loading: bool,
     ) {
+        self.metrics_count = series.len();
+        // Clamp selected index to valid range
+        if self.selected_metric_index >= series.len() {
+            self.selected_metric_index = series.len().saturating_sub(1);
+        }
+
         // Each chart gets CHART_HEIGHT rows, with 1 row gap between them
         let loading_indicator_height: u16 = if still_loading { 2 } else { 0 };
         let total_height: u16 = (series.len() as u16) * CHART_HEIGHT
@@ -547,7 +564,20 @@ impl DetailPane {
         self.metrics_total_height = total_height;
         self.metrics_visible_height = area.height;
 
-        // Clamp scroll
+        // Auto-scroll to keep the selected chart visible
+        let selected_y_start = (self.selected_metric_index as u16) * (CHART_HEIGHT + 1);
+        let selected_y_end = selected_y_start + CHART_HEIGHT;
+
+        // If the selected chart is below the viewport, scroll down
+        if selected_y_end > self.metrics_scroll + area.height {
+            self.metrics_scroll = selected_y_end.saturating_sub(area.height);
+        }
+        // If the selected chart is above the viewport, scroll up
+        if selected_y_start < self.metrics_scroll {
+            self.metrics_scroll = selected_y_start;
+        }
+
+        // Clamp scroll to valid range
         let max_scroll = total_height.saturating_sub(area.height);
         self.metrics_scroll = self.metrics_scroll.min(max_scroll);
 
@@ -577,7 +607,8 @@ impl DetailPane {
                     };
 
                     let color = CHART_COLORS[i % CHART_COLORS.len()];
-                    self.render_single_chart(frame, chart_area, metric, color);
+                    let is_selected = i == self.selected_metric_index;
+                    self.render_single_chart(frame, chart_area, metric, color, is_selected);
                 }
             }
 
@@ -625,6 +656,7 @@ impl DetailPane {
         area: Rect,
         metric: &MetricSeries,
         color: Color,
+        is_selected: bool,
     ) {
         if metric.points.is_empty() || area.height < 3 {
             return;
@@ -654,6 +686,12 @@ impl DetailPane {
         let y_label_min = format_number(y_min);
         let y_label_max = format_number(y_max);
 
+        let border_color = if is_selected {
+            Theme::BORDER_ACTIVE
+        } else {
+            Theme::BORDER
+        };
+
         let chart = Chart::new(vec![dataset])
             .block(
                 Block::default()
@@ -662,7 +700,7 @@ impl DetailPane {
                         Style::default().fg(color).add_modifier(Modifier::BOLD),
                     ))
                     .borders(Borders::ALL)
-                    .border_style(Style::default().fg(Theme::BORDER)),
+                    .border_style(Style::default().fg(border_color)),
             )
             .x_axis(
                 Axis::default()
