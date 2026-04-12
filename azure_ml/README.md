@@ -193,4 +193,4 @@ This client is auto-generated from TypeSpec definitions. To report issues or con
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License - see the file headers for details.
