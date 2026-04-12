@@ -104,7 +104,7 @@ pub fn render_table<T>(
     let table = Table::new(rows, &widths)
         .header(header)
         .block(block)
-        .highlight_style(theme::selected_style())
+        .row_highlight_style(theme::selected_style())
         .highlight_symbol("▸ ");
 
     frame.render_stateful_widget(table, area, table_state);

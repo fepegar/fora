@@ -741,10 +741,10 @@ impl ExperimentsTab {
 
         let table = Table::new(rows, &widths)
             .header(header)
-            .highlight_style(theme::selected_style())
+            .row_highlight_style(theme::selected_style())
             .highlight_symbol("▸ ");
 
-        let mut ts = self.table_state.clone();
+        let mut ts = self.table_state;
         frame.render_stateful_widget(table, inner, &mut ts);
     }
 }

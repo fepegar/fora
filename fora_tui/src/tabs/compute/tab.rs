@@ -267,7 +267,7 @@ impl ComputeTab {
             .borders(Borders::ALL)
             .border_style(theme::border_style(true));
 
-        let mut table_state = self.list_state.table_state.clone();
+        let mut table_state = self.list_state.table_state;
         table::render_table(
             frame,
             area,
