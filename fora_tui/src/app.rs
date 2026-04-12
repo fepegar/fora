@@ -251,7 +251,7 @@ impl App {
     }
 
     fn render(&mut self, frame: &mut ratatui::Frame) {
-        let area = frame.size();
+        let area = frame.area();
 
         // Layout: tab bar (1) | content (flex) | help bar (1, optional) | error (1, optional)
         let mut constraints = vec![Constraint::Length(1), Constraint::Min(1)];
