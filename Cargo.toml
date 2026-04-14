@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "azure_ml",
+    "azure_ml_run_history",
     "fora_tui",
     "fora_cli",
     "mlflow"

@@ -194,6 +194,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "azure_machinelearningservices_runhistory"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "azure_core",
+ "serde",
+]
+
+[[package]]
 name = "azure_ml"
 version = "0.1.0"
 dependencies = [
