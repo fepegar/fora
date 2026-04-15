@@ -31,6 +31,6 @@ futures = "0.3"
 tokio-util = "0.7"
 async-trait = "0.1"
 dirs = "5.0"
-reqwest = { version = "0.13", features = ["json", "rustls", "native-tls-vendored", "query"] }
+reqwest = { version = "0.13", default-features = false, features = ["json", "rustls-tls"] }
 url = "2.4"
 serde_with = "3.0"
