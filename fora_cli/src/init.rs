@@ -115,7 +115,8 @@ pub async fn run_init_wizard() -> Result<()> {
 
     // Select subscriptions
     let selected_subs: Vec<Subscription> = {
-        let mut prompt = cliclack::multiselect("Select subscriptions to use");
+        let mut prompt =
+            cliclack::multiselect("Select subscriptions to use\n  (space to select, enter to confirm)");
         for sub in &subscriptions {
             prompt = prompt.item(sub.clone(), &sub.display_name, &sub.subscription_id);
         }
@@ -157,7 +158,8 @@ pub async fn run_init_wizard() -> Result<()> {
 
     // Select workspaces
     let selected_workspaces: Vec<DiscoveredWorkspace> = {
-        let mut prompt = cliclack::multiselect("Select ML workspaces to add");
+        let mut prompt =
+            cliclack::multiselect("Select ML workspaces to add\n  (space to select, enter to confirm)");
         for entry in &ws_entries {
             let hint = format!("{} · {}", entry.location, entry.resource_group);
             prompt = prompt.item(entry.clone(), &entry.name, hint);
@@ -165,7 +167,9 @@ pub async fn run_init_wizard() -> Result<()> {
         if ws_entries.len() == 1 {
             prompt = prompt.initial_values(vec![ws_entries[0].clone()]);
         }
-        prompt.interact().context("Workspace selection cancelled")?
+        prompt
+            .interact()
+            .context("Workspace selection cancelled")?
     };
 
     // Select default workspace if more than one
