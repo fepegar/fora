@@ -1,12 +1,42 @@
 # Installation
 
-Fora does not have pre-built binaries yet, so it must be installed from source.
+## Quick install (recommended)
+
+The fastest way to install Fora is with the install script. It detects your OS and architecture, downloads the right binary from the latest release, and puts it in `~/.local/bin`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/fepegar/fora/main/install.sh | sh
+```
+
+Or with `wget`:
+
+```bash
+wget -qO- https://raw.githubusercontent.com/fepegar/fora/main/install.sh | sh
+```
+
+### Options
+
+| Environment variable | Description | Default |
+|---|---|---|
+| `FORA_VERSION` | Install a specific release tag (e.g. `v0.1.0-20260415-abc1234`) | latest |
+| `FORA_INSTALL_DIR` | Directory to install the binary into | `~/.local/bin` |
+| `FORA_QUIET` | Suppress informational output (`1` or `true`) | — |
+| `FORA_DEBUG` | Show debug output (`1` or `true`) | — |
+
+Pre-built binaries are available for:
+
+- Linux (x86_64, aarch64)
+- macOS (x86_64, Apple Silicon)
+- Windows (x86_64)
 
 ## Prerequisites
 
-- **Rust toolchain** — 1.70 or later (install via [rustup](https://rustup.rs/) or a tool manager like [mise](https://mise.jdx.dev/))
 - **Azure CLI** — installed and authenticated (`az login`)
 - Access to an Azure ML workspace
+
+## Install from source
+
+The following methods require the **Rust toolchain** (1.70 or later). Install it via [rustup](https://rustup.rs/) or a tool manager like [mise](https://mise.jdx.dev/).
 
 ## Install with mise
 
