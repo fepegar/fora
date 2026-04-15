@@ -135,12 +135,27 @@ install_fora() {
   if download "$checksum_url" "${tmp_dir}/SHA256SUMS" 2>/dev/null; then
     info "verifying checksum..."
     cd "$tmp_dir"
-    if command -v sha256sum >/dev/null 2>&1; then
-      grep "$asset" SHA256SUMS | sha256sum -c --quiet - || error "checksum verification failed"
-    elif command -v shasum >/dev/null 2>&1; then
-      grep "$asset" SHA256SUMS | shasum -a 256 -c --quiet - || error "checksum verification failed"
+    checksum_entry_file="${tmp_dir}/SHA256SUMS.${asset}"
+    if awk -v asset="$asset" '
+      {
+        file = $NF
+        sub(/^\*/, "", file)
+        if (file == asset) {
+          print
+          count++
+        }
+      }
+      END { exit(count == 1 ? 0 : 1) }
+    ' SHA256SUMS > "$checksum_entry_file"; then
+      if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum -c --quiet "$checksum_entry_file" || error "checksum verification failed"
+      elif command -v shasum >/dev/null 2>&1; then
+        shasum -a 256 -c --quiet "$checksum_entry_file" || error "checksum verification failed"
+      else
+        info "WARNING: neither sha256sum nor shasum found, skipping checksum verification"
+      fi
     else
-      info "WARNING: neither sha256sum nor shasum found, skipping checksum verification"
+      error "checksum entry for ${asset} missing or ambiguous"
     fi
   else
     info "WARNING: checksums not available for this release, skipping verification"
