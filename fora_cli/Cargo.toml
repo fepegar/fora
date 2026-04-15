@@ -23,4 +23,3 @@ tracing-subscriber.workspace = true
 chrono-tz = { workspace = true }
 cliclack = "0.5.2"
 toml = "1.1.2"
-openssl = { workspace = true }

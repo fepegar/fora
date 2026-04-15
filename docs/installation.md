@@ -36,7 +36,7 @@ Pre-built binaries are available for:
 
 ## Install from source
 
-The following methods require the **Rust toolchain** (1.70 or later). Install it via [rustup](https://rustup.rs/) or a tool manager like [mise](https://mise.jdx.dev/).
+The following methods require the **Rust toolchain** (1.88 or later). Install it via [rustup](https://rustup.rs/) or a tool manager like [mise](https://mise.jdx.dev/).
 
 ## Install with mise
 

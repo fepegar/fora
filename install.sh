@@ -98,10 +98,19 @@ install_fora() {
     info "installing version: $version"
   else
     info "fetching latest release..."
-    version="$(fetch "https://api.github.com/repos/${REPO}/releases/latest" \
-      | grep '"tag_name"' \
-      | sed 's/.*"tag_name" *: *"\([^"]*\)".*/\1/')"
-    if [ -z "$version" ]; then
+    version=""
+    if command -v jq >/dev/null 2>&1; then
+      version="$(fetch "https://api.github.com/repos/${REPO}/releases/latest" \
+        | jq -r '.tag_name // empty')"
+    elif command -v curl >/dev/null 2>&1; then
+      latest_release_url="$(curl -fsSL -o /dev/null -w '%{url_effective}' "https://github.com/${REPO}/releases/latest")"
+      version="$(basename "$latest_release_url")"
+    else
+      version="$(fetch "https://api.github.com/repos/${REPO}/releases/latest" \
+        | grep '"tag_name"' \
+        | sed 's/.*"tag_name" *: *"\([^"]*\)".*/\1/')"
+    fi
+    if [ -z "$version" ] || [ "$version" = "null" ]; then
       error "could not determine latest version. Set FORA_VERSION to install a specific version."
     fi
     info "latest version: $version"
@@ -116,10 +125,26 @@ install_fora() {
   download_url="https://github.com/${REPO}/releases/download/${version}/${asset}"
 
   # Download
-  tmp_dir="$(mktemp -d)"
+  tmp_dir="$(mktemp -d 2>/dev/null || mktemp -d -t fora)"
   trap 'rm -rf "$tmp_dir"' EXIT
   info "downloading ${asset}..."
   download "$download_url" "${tmp_dir}/${asset}"
+
+  # Verify checksum
+  checksum_url="https://github.com/${REPO}/releases/download/${version}/SHA256SUMS"
+  if download "$checksum_url" "${tmp_dir}/SHA256SUMS" 2>/dev/null; then
+    info "verifying checksum..."
+    cd "$tmp_dir"
+    if command -v sha256sum >/dev/null 2>&1; then
+      grep "$asset" SHA256SUMS | sha256sum -c --quiet - || error "checksum verification failed"
+    elif command -v shasum >/dev/null 2>&1; then
+      grep "$asset" SHA256SUMS | shasum -a 256 -c --quiet - || error "checksum verification failed"
+    else
+      info "WARNING: neither sha256sum nor shasum found, skipping checksum verification"
+    fi
+  else
+    info "WARNING: checksums not available for this release, skipping verification"
+  fi
 
   # Extract
   cd "$tmp_dir"

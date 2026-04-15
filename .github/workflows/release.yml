@@ -65,6 +65,7 @@ jobs:
 
       - name: Package (Windows)
         if: runner.os == 'Windows'
+        shell: bash
         run: |
           cd target/${{ matrix.target }}/release
           7z a ../../../fora-${{ matrix.target }}.zip fora.exe
@@ -91,8 +92,42 @@ jobs:
       - name: Generate release tag
         id: tag
         run: |
-          VERSION="v0.1.0-$(date +%Y%m%d)-$(echo ${{ github.sha }} | cut -c1-7)"
+          WORKSPACE_VERSION="$(awk '
+            /^\[workspace\.package\]/ { in_section=1; next }
+            /^\[/ { in_section=0 }
+            in_section && /^\s*version\s*=/ {
+              if (match($0, /"[^"]+"/)) {
+                print substr($0, RSTART + 1, RLENGTH - 2)
+                exit
+              }
+            }
+          ' Cargo.toml)"
+
+          PACKAGE_VERSION="$(awk '
+            /^\[package\]/ { in_section=1; next }
+            /^\[/ { in_section=0 }
+            in_section && /^\s*version\s*=/ {
+              if (match($0, /"[^"]+"/)) {
+                print substr($0, RSTART + 1, RLENGTH - 2)
+                exit
+              }
+            }
+          ' Cargo.toml)"
+
+          CRATE_VERSION="${WORKSPACE_VERSION:-$PACKAGE_VERSION}"
+
+          if [ -z "$CRATE_VERSION" ]; then
+            echo "Failed to determine release version from Cargo.toml" >&2
+            exit 1
+          fi
+
+          VERSION="v${CRATE_VERSION}-$(date +%Y%m%d)-$(echo ${{ github.sha }} | cut -c1-7)"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Generate checksums
+        run: |
+          cd artifacts
+          sha256sum fora-* > SHA256SUMS
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
@@ -100,4 +135,5 @@ jobs:
           tag_name: ${{ steps.tag.outputs.version }}
           name: ${{ steps.tag.outputs.version }}
           generate_release_notes: true
-          files: artifacts/*
+          files: |
+            artifacts/*
