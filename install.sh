@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-REPO="fepegar/fora"
+REPO="samb-t/fora"
 BINARY="fora"
 
 #region logging

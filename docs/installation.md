@@ -5,13 +5,13 @@
 The fastest way to install Fora is with the install script. It detects your OS and architecture, downloads the right binary from the latest release, and puts it in `~/.local/bin`:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/fepegar/fora/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/samb-t/fora/main/install.sh | sh
 ```
 
 Or with `wget`:
 
 ```bash
-wget -qO- https://raw.githubusercontent.com/fepegar/fora/main/install.sh | sh
+wget -qO- https://raw.githubusercontent.com/samb-t/fora/main/install.sh | sh
 ```
 
 ### Options
