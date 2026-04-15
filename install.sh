@@ -125,7 +125,7 @@ install_fora() {
   download_url="https://github.com/${REPO}/releases/download/${version}/${asset}"
 
   # Download
-  tmp_dir="$(mktemp -d 2>/dev/null || mktemp -d -t fora)"
+  tmp_dir="$(mktemp -d 2>/dev/null || mktemp -d -t fora.XXXXXX)"
   trap 'rm -rf "$tmp_dir"' EXIT
   info "downloading ${asset}..."
   download "$download_url" "${tmp_dir}/${asset}"
