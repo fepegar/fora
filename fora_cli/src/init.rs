@@ -194,7 +194,7 @@ pub async fn run_init_wizard() -> Result<()> {
         .map(|tz| tz.name().to_string())
         .collect();
     let timezone: String = cliclack::input("Enter your timezone")
-        .placeholder("Europe/London")
+        .placeholder("UTC")
         .default_input("UTC")
         .autocomplete(tz_names)
         .validate(|input: &String| {
