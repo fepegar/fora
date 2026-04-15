@@ -5,13 +5,13 @@
 The fastest way to install Fora is with the install script. It detects your OS and architecture, downloads the right binary from the latest release, and puts it in `~/.local/bin`:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/samb-t/fora/main/install.sh | sh
+curl -fsSL https://samb-t.github.io/fora/install.sh | sh
 ```
 
 Or with `wget`:
 
 ```bash
-wget -qO- https://raw.githubusercontent.com/samb-t/fora/main/install.sh | sh
+wget -qO- https://samb-t.github.io/fora/install.sh | sh
 ```
 
 ### Options
@@ -29,6 +29,28 @@ Pre-built binaries are available for:
 - macOS (x86_64, Apple Silicon)
 - Windows (x86_64)
 
+## Install with mise
+
+If you use [mise](https://mise.jdx.dev/) for tool management, you can install Fora from the pre-built GitHub releases using the [github backend](https://mise.jdx.dev/dev-tools/backends/github.html):
+
+```bash
+mise use -g github:samb-t/fora
+```
+
+Or manually add it to your mise config:
+
+```toml
+# In your mise.toml
+[tools]
+fora = "github:samb-t/fora"
+```
+
+Then run:
+
+```bash
+mise install
+```
+
 ## Prerequisites
 
 - **Azure CLI** — installed and authenticated (`az login`)
@@ -38,17 +60,15 @@ Pre-built binaries are available for:
 
 The following methods require the **Rust toolchain** (1.88 or later). Install it via [rustup](https://rustup.rs/) or a tool manager like [mise](https://mise.jdx.dev/).
 
-## Install with mise
+### Install with mise (from source)
 
-If you use [mise](https://mise.jdx.dev/) for tool management, you can install Fora using the cargo backend:
-
-To install `fora` globally, run the following command
+If you prefer to build from source using mise, you can use the cargo backend:
 
 ```bash
 mise use -g cargo:https://github.com/samb-t/fora.git
 ```
 
-Or manually add the following to your mise config:
+Or manually add it to your mise config:
 
 ```toml
 # In your mise.toml
@@ -62,7 +82,7 @@ Then run:
 mise install
 ```
 
-## Install from source with Cargo
+### Install with Cargo
 
 Clone the repository and install the `fora` binary:
 
