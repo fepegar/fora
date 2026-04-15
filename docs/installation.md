@@ -1,8 +1,30 @@
 # Installation
 
-## Quick install (recommended)
+## Install with mise (recommended)
 
-The fastest way to install Fora is with the install script. It detects your OS and architecture, downloads the right binary from the latest release, and puts it in `~/.local/bin`:
+If you use [mise](https://mise.jdx.dev/) for tool management, you can install Fora from the pre-built GitHub releases using the [github backend](https://mise.jdx.dev/dev-tools/backends/github.html):
+
+```bash
+mise use -g github:samb-t/fora
+```
+
+Or manually add it to your mise config:
+
+```toml
+# In your mise.toml
+[tools]
+"github:samb-t/fora" = "latest"
+```
+
+Then run:
+
+```bash
+mise install
+```
+
+## Quick install
+
+The install script detects your OS and architecture, downloads the right binary from the latest release, and puts it in `~/.local/bin`:
 
 ```bash
 curl -fsSL https://samb-t.github.io/fora/install.sh | sh
@@ -28,28 +50,6 @@ Pre-built binaries are available for:
 - Linux (x86_64, aarch64)
 - macOS (x86_64, Apple Silicon)
 - Windows (x86_64)
-
-## Install with mise
-
-If you use [mise](https://mise.jdx.dev/) for tool management, you can install Fora from the pre-built GitHub releases using the [github backend](https://mise.jdx.dev/dev-tools/backends/github.html):
-
-```bash
-mise use -g github:samb-t/fora
-```
-
-Or manually add it to your mise config:
-
-```toml
-# In your mise.toml
-[tools]
-fora = "github:samb-t/fora"
-```
-
-Then run:
-
-```bash
-mise install
-```
 
 ## Prerequisites
 
