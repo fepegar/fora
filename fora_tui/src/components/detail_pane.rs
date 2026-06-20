@@ -241,6 +241,18 @@ impl DetailPane {
         metric_keys: &[String],
         action_tx: &ActionSender,
     ) -> DetailKeyResult {
+        // While a Files download prompt / overwrite confirmation is open,
+        // route every key straight to the Files sub-tab so typing, Enter
+        // and Esc drive the modal instead of closing the pane or
+        // switching sub-tabs.
+        if self.active_tab == DetailTab::Files && self.files_view.modal_active() {
+            return if self.files_view.handle_key(key, run_id, action_tx) {
+                DetailKeyResult::Consumed
+            } else {
+                DetailKeyResult::Ignored
+            };
+        }
+
         // Esc always closes the pane regardless of active sub-tab.
         if key.code == KeyCode::Esc {
             return DetailKeyResult::Close;

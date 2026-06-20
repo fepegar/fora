@@ -12,11 +12,11 @@
 //! switching jobs / closing the pane / switching workspaces reliably
 //! cancels outstanding work.
 
+pub mod download;
 pub mod fetcher;
 pub mod highlight;
 pub mod log_highlight;
 pub mod preview;
-pub mod save;
 pub mod state;
 pub mod tree;
 
@@ -28,6 +28,8 @@ use ratatui::Frame;
 
 use crate::app::Action;
 use crate::client::AzureClient;
+use crate::components::confirm_dialog::ConfirmDialog;
+use crate::components::input_prompt::{InputOutcome, InputPrompt};
 use crate::tabs::{is_active_status, ActionSender};
 
 pub use state::{FilesState, PaneFocus};
@@ -54,12 +56,28 @@ impl Default for FilesConfig {
     }
 }
 
+/// The artifact selected for download when the destination prompt opens.
+#[derive(Debug, Clone)]
+struct DownloadSource {
+    artifact_path: String,
+    is_dir: bool,
+    item_name: String,
+}
+
 /// Files sub-tab state + render surface.
 pub struct FilesView {
     client: Option<AzureClient>,
     state: FilesState,
     config: FilesConfig,
     last_status_active: bool,
+    /// Destination prompt shown when downloading the highlighted item.
+    input_prompt: InputPrompt,
+    /// Overwrite confirmation shown when the destination already exists.
+    confirm: ConfirmDialog,
+    /// The item being downloaded, captured when the prompt opens.
+    download_source: Option<DownloadSource>,
+    /// Resolved destination awaiting overwrite confirmation.
+    pending_dest: Option<std::path::PathBuf>,
 }
 
 impl FilesView {
@@ -75,6 +93,10 @@ impl FilesView {
             state,
             config,
             last_status_active: false,
+            input_prompt: InputPrompt::default(),
+            confirm: ConfirmDialog::default(),
+            download_source: None,
+            pending_dest: None,
         }
     }
 
@@ -82,6 +104,23 @@ impl FilesView {
     /// changed). Cancels any in-flight work and clears local state.
     pub fn reset(&mut self) {
         self.state.reset();
+        self.cancel_download_flow();
+    }
+
+    /// Close any open download prompt / confirmation and drop the pending
+    /// download.
+    fn cancel_download_flow(&mut self) {
+        self.input_prompt.close();
+        self.confirm.active = false;
+        self.download_source = None;
+        self.pending_dest = None;
+    }
+
+    /// True while a download prompt or overwrite confirmation is open, so
+    /// the parent routes keys here instead of treating them as sub-tab /
+    /// pane controls.
+    pub fn modal_active(&self) -> bool {
+        self.input_prompt.active || self.confirm.active
     }
 
     /// Called when the user switches *to* the Files sub-tab. Triggers an
@@ -192,6 +231,28 @@ impl FilesView {
 
     /// Handle a key event. Returns `true` if consumed.
     pub fn handle_key(&mut self, key: KeyEvent, run_id: &str, action_tx: &ActionSender) -> bool {
+        // Download modals take priority: while either is open, every key
+        // drives the prompt / confirmation rather than tree navigation.
+        if self.input_prompt.active {
+            match self.input_prompt.handle_key(key) {
+                InputOutcome::Pending => {}
+                InputOutcome::Submitted(path) => self.on_destination_submitted(path, action_tx),
+                InputOutcome::Cancelled => self.download_source = None,
+            }
+            return true;
+        }
+        if self.confirm.active {
+            if let Some(confirmed) = self.confirm.handle_key(key) {
+                if confirmed {
+                    self.start_pending_download(action_tx);
+                } else {
+                    self.pending_dest = None;
+                    self.download_source = None;
+                }
+            }
+            return true;
+        }
+
         match key.code {
             KeyCode::Left => {
                 self.state.focus = PaneFocus::Tree;
@@ -258,7 +319,7 @@ impl FilesView {
                 true
             }
             KeyCode::Char('s') => {
-                self.save_selected(action_tx);
+                self.begin_download(action_tx);
                 true
             }
             KeyCode::Char('r') => {
@@ -302,25 +363,111 @@ impl FilesView {
         }
     }
 
-    fn save_selected(&mut self, action_tx: &ActionSender) {
-        let Some(path) = self.state.previewed_path().cloned() else {
-            let _ = action_tx.send(Action::Error("No file selected to save".to_string()));
+    /// Open the destination prompt for the highlighted file or directory,
+    /// pre-filled with `<save_dir>/<name>`.
+    fn begin_download(&mut self, action_tx: &ActionSender) {
+        let Some(row) = self.state.selected_row().cloned() else {
+            let _ = action_tx.send(Action::Error("No item selected to download".to_string()));
             return;
         };
-        let Some(bytes) = self.state.previewed_bytes() else {
+        if self.state.current_run_id.is_none() {
+            return;
+        }
+        // Derive the on-disk name from the artifact path through the
+        // sanitiser so a hostile leaf (`..`, embedded separators) can't
+        // redirect the write outside the chosen destination.
+        let item_name = match download::sanitised_leaf(&row.path) {
+            Ok(name) => name,
+            Err(e) => {
+                let _ = action_tx.send(Action::Error(format!("Cannot download: {:#}", e)));
+                return;
+            }
+        };
+        let default_dest = download::default_destination(&self.config.save_dir, &item_name);
+        let kind = if row.is_dir { "directory" } else { "file" };
+        self.download_source = Some(DownloadSource {
+            artifact_path: row.path.clone(),
+            is_dir: row.is_dir,
+            item_name,
+        });
+        self.input_prompt
+            .open(format!("Download {} to", kind), default_dest);
+    }
+
+    /// The user accepted a destination path: resolve it, then either ask
+    /// for overwrite confirmation or start the download immediately.
+    fn on_destination_submitted(&mut self, path: String, action_tx: &ActionSender) {
+        let Some(source) = self.download_source.clone() else {
+            return;
+        };
+        if path.is_empty() {
+            // A blank input on Enter is a user cancellation, not a failure.
+            let _ = action_tx.send(Action::Notice("Download cancelled".to_string()));
+            self.download_source = None;
+            return;
+        }
+        let resolved = match download::resolve_path(&path) {
+            Ok(p) => p,
+            Err(e) => {
+                let _ = action_tx.send(Action::Error(format!("Invalid path: {:#}", e)));
+                self.download_source = None;
+                return;
+            }
+        };
+        let dest = download::final_destination(&resolved, source.is_dir, &source.item_name);
+        if download::destination_exists(&dest) {
+            // A directory download replaces the destination wholesale
+            // (existing contents are deleted), so spell that out rather than
+            // a generic "Overwrite?".
+            let msg = if source.is_dir {
+                format!(
+                    "{} exists. Replace it? Existing contents will be deleted.",
+                    dest.display()
+                )
+            } else {
+                format!("{} exists. Overwrite?", dest.display())
+            };
+            self.confirm.show(msg);
+            self.pending_dest = Some(dest);
+        } else {
+            self.spawn_download_task(source, dest, action_tx);
+            self.download_source = None;
+        }
+    }
+
+    /// Overwrite confirmed: start the download to the pending destination.
+    fn start_pending_download(&mut self, action_tx: &ActionSender) {
+        let (Some(source), Some(dest)) = (self.download_source.take(), self.pending_dest.take())
+        else {
+            return;
+        };
+        self.spawn_download_task(source, dest, action_tx);
+    }
+
+    fn spawn_download_task(
+        &mut self,
+        source: DownloadSource,
+        dest: std::path::PathBuf,
+        action_tx: &ActionSender,
+    ) {
+        let Some(client) = self.client.clone() else {
             let _ = action_tx.send(Action::Error(
-                "Preview not loaded yet — cannot save".to_string(),
+                "No Azure client: workspace not configured".to_string(),
             ));
             return;
         };
         let Some(run_id) = self.state.current_run_id.clone() else {
             return;
         };
-        save::spawn_save(
+        let token = self.state.cancel_token();
+        download::spawn_download(
+            client,
             run_id,
-            path,
-            bytes,
-            self.config.save_dir.clone(),
+            source.artifact_path,
+            source.is_dir,
+            source.item_name,
+            dest,
+            token,
             action_tx.clone(),
         );
     }
@@ -425,6 +572,10 @@ impl FilesView {
 
         tree::render_tree(frame, tree_area, &mut self.state);
         preview::render_preview(frame, preview_area, &mut self.state);
+
+        // Download modals overlay the whole sub-tab area.
+        self.input_prompt.render(frame, area);
+        self.confirm.render(frame, area);
     }
 
     /// Key hints contributed by the Files sub-tab.
@@ -434,7 +585,7 @@ impl FilesView {
             ("↑↓", "Navigate"),
             ("Enter", "Open"),
             ("z", "Fullscreen"),
-            ("s", "Save"),
+            ("s", "Download"),
             ("r", "Refresh"),
         ]
     }
@@ -512,5 +663,153 @@ mod tests {
         assert!(!view.has_preview());
         view.state.select_preview("std_log.txt".to_string());
         assert!(view.has_preview());
+    }
+
+    fn entry(path: &str, is_dir: bool) -> mlflow::ArtifactEntry {
+        mlflow::ArtifactEntry {
+            path: path.to_string(),
+            is_dir,
+            file_size: None,
+        }
+    }
+
+    fn view_with_file() -> FilesView {
+        let mut v = fresh_view();
+        v.state.set_dir_loaded("", vec![entry("model.pkl", false)]);
+        v
+    }
+
+    fn view_with_dir() -> FilesView {
+        let mut v = fresh_view();
+        v.state.set_dir_loaded("", vec![entry("checkpoints", true)]);
+        v
+    }
+
+    fn unique_tmp_path(name: &str) -> std::path::PathBuf {
+        let mut p = std::env::temp_dir();
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+        p.push(format!("fora-fv-{}-{}-{}", std::process::id(), nanos, name));
+        p
+    }
+
+    #[test]
+    fn s_with_no_rows_emits_error() {
+        let (tx, mut rx) = mpsc::unbounded_channel::<Action>();
+        let mut view = fresh_view();
+        let consumed = view.handle_key(key(KeyCode::Char('s')), "run-123", &tx);
+        assert!(consumed);
+        assert!(!view.modal_active());
+        match rx.try_recv() {
+            Ok(Action::Error(msg)) => assert!(msg.contains("No item selected")),
+            other => panic!("expected Error, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn s_opens_prompt_prefilled_for_file() {
+        let (tx, _rx) = mpsc::unbounded_channel::<Action>();
+        let mut view = view_with_file();
+        let consumed = view.handle_key(key(KeyCode::Char('s')), "run-123", &tx);
+        assert!(consumed);
+        assert!(view.modal_active());
+        assert!(view.input_prompt.active);
+        assert_eq!(view.input_prompt.value(), "./model.pkl");
+        let src = view.download_source.as_ref().unwrap();
+        assert!(!src.is_dir);
+        assert_eq!(src.item_name, "model.pkl");
+    }
+
+    #[test]
+    fn s_opens_prompt_for_directory() {
+        let (tx, _rx) = mpsc::unbounded_channel::<Action>();
+        let mut view = view_with_dir();
+        view.handle_key(key(KeyCode::Char('s')), "run-123", &tx);
+        assert!(view.input_prompt.active);
+        assert_eq!(view.input_prompt.value(), "./checkpoints");
+        assert!(view.download_source.as_ref().unwrap().is_dir);
+    }
+
+    #[test]
+    fn esc_cancels_prompt_and_clears_source() {
+        let (tx, _rx) = mpsc::unbounded_channel::<Action>();
+        let mut view = view_with_file();
+        view.handle_key(key(KeyCode::Char('s')), "run-123", &tx);
+        assert!(view.modal_active());
+        let consumed = view.handle_key(key(KeyCode::Esc), "run-123", &tx);
+        assert!(consumed);
+        assert!(!view.modal_active());
+        assert!(view.download_source.is_none());
+    }
+
+    #[test]
+    fn submitting_existing_path_opens_overwrite_confirm() {
+        let (tx, _rx) = mpsc::unbounded_channel::<Action>();
+        let existing = unique_tmp_path("exists.pkl");
+        std::fs::write(&existing, b"x").unwrap();
+
+        let mut view = view_with_file();
+        view.handle_key(key(KeyCode::Char('s')), "run-123", &tx);
+        // Replace the prompt contents with the existing path and submit.
+        view.input_prompt
+            .open("Download file to", existing.to_string_lossy().into_owned());
+        let consumed = view.handle_key(key(KeyCode::Enter), "run-123", &tx);
+
+        assert!(consumed);
+        assert!(view.confirm.active, "overwrite confirm should be shown");
+        assert!(!view.input_prompt.active);
+        assert_eq!(view.pending_dest.as_deref(), Some(existing.as_path()));
+
+        let _ = std::fs::remove_file(&existing);
+    }
+
+    #[test]
+    fn overwrite_decline_clears_pending() {
+        let (tx, _rx) = mpsc::unbounded_channel::<Action>();
+        let existing = unique_tmp_path("decline.pkl");
+        std::fs::write(&existing, b"x").unwrap();
+
+        let mut view = view_with_file();
+        view.handle_key(key(KeyCode::Char('s')), "run-123", &tx);
+        view.input_prompt
+            .open("Download file to", existing.to_string_lossy().into_owned());
+        view.handle_key(key(KeyCode::Enter), "run-123", &tx);
+        assert!(view.confirm.active);
+
+        view.handle_key(key(KeyCode::Char('n')), "run-123", &tx);
+        assert!(!view.confirm.active);
+        assert!(view.pending_dest.is_none());
+        assert!(view.download_source.is_none());
+
+        let _ = std::fs::remove_file(&existing);
+    }
+
+    #[test]
+    fn submitting_new_path_skips_confirm_and_reports_no_client() {
+        let (tx, mut rx) = mpsc::unbounded_channel::<Action>();
+        let target = unique_tmp_path("new.pkl");
+        assert!(!target.exists());
+
+        let mut view = view_with_file();
+        view.handle_key(key(KeyCode::Char('s')), "run-123", &tx);
+        view.input_prompt
+            .open("Download file to", target.to_string_lossy().into_owned());
+        view.handle_key(key(KeyCode::Enter), "run-123", &tx);
+
+        assert!(!view.confirm.active, "no overwrite confirm for a new path");
+        assert!(!view.modal_active());
+        assert!(view.download_source.is_none());
+        // With no client configured the spawn reports an error.
+        let mut saw_no_client = false;
+        while let Ok(action) = rx.try_recv() {
+            if let Action::Error(msg) = action {
+                if msg.contains("No Azure client") {
+                    saw_no_client = true;
+                }
+            }
+        }
+        assert!(saw_no_client, "expected a 'No Azure client' error");
     }
 }
