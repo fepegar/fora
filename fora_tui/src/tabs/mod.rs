@@ -91,4 +91,21 @@ pub trait Tab {
 
     /// Key hints for the help bar in the current state.
     fn key_hints(&self) -> Vec<(&'static str, &'static str)>;
+
+    /// Render a fullscreen overlay into the entire terminal area. Used
+    /// when the user toggled the fullscreen preview mode. Default
+    /// implementation returns `false` (nothing to fullscreen), in which
+    /// case the app should fall back to the normal `render`. Tabs that
+    /// host a file preview override this to delegate to their detail
+    /// pane.
+    fn render_fullscreen(&mut self, _frame: &mut Frame, _area: Rect) -> bool {
+        false
+    }
+
+    /// True when [`Self::render_fullscreen`] would render something.
+    /// Used by the app to suppress the fullscreen toggle when there's
+    /// nothing to show.
+    fn supports_fullscreen(&self) -> bool {
+        false
+    }
 }

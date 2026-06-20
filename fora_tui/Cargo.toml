@@ -25,3 +25,12 @@ async-trait = { workspace = true }
 anyhow = "1.0"
 toml = "0.8"
 unicode-width = "0.2"
+bytes = { workspace = true }
+lru = { workspace = true }
+syntect = { workspace = true }
+ansi-to-tui = { workspace = true }
+ratatui-image = { workspace = true }
+image = { workspace = true }
+mime_guess = { workspace = true }
+regex = "1"
+shellexpand = "3"

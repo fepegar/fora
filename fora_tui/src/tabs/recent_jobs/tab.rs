@@ -15,6 +15,7 @@ use crate::client::AzureClient;
 use crate::components::column_picker::{ColumnEntry, ColumnPicker};
 use crate::components::confirm_dialog::ConfirmDialog;
 use crate::components::detail_pane::{self, DetailKeyResult, DetailPane};
+use crate::components::files_view::FilesConfig;
 use crate::components::job_detail::JobDetail;
 use crate::components::search_bar::SearchBar;
 use crate::components::spinner::Spinner;
@@ -62,6 +63,7 @@ impl RecentJobsTab {
         experiment_cache: HashMap<String, String>,
         tz: chrono_tz::Tz,
         refresh_interval: u64,
+        files_config: FilesConfig,
     ) -> Self {
         let mut columns = default_columns(tz);
         table::apply_column_config(&mut columns, column_config);
@@ -72,7 +74,7 @@ impl RecentJobsTab {
             list_state: ListState::new(),
             columns,
             detail_open: false,
-            detail_pane: DetailPane::new(),
+            detail_pane: DetailPane::with_files_config(client.clone(), files_config),
             search: SearchBar::default(),
             column_picker: ColumnPicker::new(),
             client,
@@ -273,7 +275,9 @@ impl Tab for RecentJobsTab {
             if let Some(job) = self.selected_job() {
                 let run_id = job.id.clone();
                 let metric_keys = job.metric_keys.clone();
-                let result = self.detail_pane.handle_key(key, &run_id, &metric_keys);
+                let result = self
+                    .detail_pane
+                    .handle_key(key, &run_id, &metric_keys, action_tx);
                 match result {
                     DetailKeyResult::Consumed => true,
                     DetailKeyResult::Close => {
@@ -442,7 +446,12 @@ impl Tab for RecentJobsTab {
             }
             Action::MetricBatchLoaded { .. }
             | Action::MetricsFetchComplete { .. }
-            | Action::MetricsFetchFailed { .. } => {
+            | Action::MetricsFetchFailed { .. }
+            | Action::RunArtifactListLoaded { .. }
+            | Action::RunArtifactListFailed { .. }
+            | Action::RunArtifactContentLoaded { .. }
+            | Action::RunArtifactContentFailed { .. }
+            | Action::RunArtifactNotModified { .. } => {
                 self.detail_pane.handle_action(action);
             }
             _ => {}
@@ -552,7 +561,7 @@ impl Tab for RecentJobsTab {
         }
 
         if self.detail_open {
-            return vec![("←→", "Tab"), ("↑↓", "Scroll"), ("Esc", "Close Detail")];
+            return self.detail_pane.key_hints();
         }
 
         let mut hints = vec![
@@ -569,6 +578,18 @@ impl Tab for RecentJobsTab {
             hints.push(("x", "Cancel Job"));
         }
         hints
+    }
+
+    fn render_fullscreen(&mut self, frame: &mut Frame, area: Rect) -> bool {
+        if !self.detail_open {
+            return false;
+        }
+        let status = self.selected_job().map(|j| j.status.clone());
+        self.detail_pane.render_fullscreen(frame, area, status)
+    }
+
+    fn supports_fullscreen(&self) -> bool {
+        self.detail_open && self.detail_pane.supports_fullscreen()
     }
 }
 

@@ -29,6 +29,43 @@ The TUI supports keyboard navigation, search and filtering, a column picker for 
 | `?` | Toggle help bar |
 | `q` | Quit |
 
+### Detail pane
+
+Pressing `Enter` on a job opens the detail pane. It exposes three
+sub-tabs, switchable with their number keys:
+
+| Key | Action |
+|-----|--------|
+| `1` | Switch to the Info sub-tab |
+| `2` | Switch to the Metrics sub-tab |
+| `3` | Switch to the Files sub-tab |
+| `Esc` | Close the detail pane |
+
+### Files sub-tab
+
+The Files sub-tab browses the run's artifact tree and previews the
+selected file in-pane. Text files are syntax-highlighted; logs keep their
+ANSI colours (e.g. from `tqdm`, `rich`) or get lightweight log-level and
+traceback highlighting; and image artifacts are rendered using the
+terminal's best available graphics protocol
+(Kitty, iTerm2, Sixel, or a Unicode half-block fallback).
+
+While a run is active, the previewed file is live-tailed every
+`file_preview_refresh_secs` seconds.
+
+| Key | Action |
+|-----|--------|
+| `←` / `→` | Move focus between the tree and the preview pane |
+| `↑` / `↓`, `j` / `k` | Navigate within the focused pane |
+| `Enter` / `Space` | Open the highlighted directory or load the highlighted file into the preview |
+| `Backspace` | Collapse the current directory or go up one level |
+| `PgUp` / `PgDn` | Page the focused pane |
+| `Home` / `g` | Jump to the top of the focused pane |
+| `End` / `G` | Jump to the bottom of the focused pane |
+| `s` | Save the previewed file to disk (collision-safe; see `save_dir`) |
+| `r` | Force-refresh the current directory and previewed file |
+| `z` | Toggle fullscreen preview (hides everything except the file content; `Esc` exits fullscreen) |
+
 ## Environment variables
 
 | Variable | Description |
