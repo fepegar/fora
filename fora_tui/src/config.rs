@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+use crate::components::files_view::FilesConfig;
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct AppConfig {
     #[serde(default, skip_serializing_if = "UiConfig::is_default")]
@@ -26,6 +28,25 @@ pub struct UiConfig {
     /// IANA timezone name (e.g. "Europe/London"). Defaults to UTC if unset.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub timezone: Option<String>,
+    /// Polling interval for live-tailing the previewed run file (seconds).
+    ///
+    /// When the previewed file belongs to an active run, the Files sub-tab
+    /// HEADs the underlying blob every `file_preview_refresh_secs` seconds
+    /// and refetches the suffix on growth. Set `0` to disable tailing.
+    #[serde(default = "default_file_preview_refresh")]
+    pub file_preview_refresh_secs: u64,
+    /// syntect theme name used for syntax-highlighted previews.
+    ///
+    /// Defaults to `base16-ocean.dark` (bundled with syntect). Any theme
+    /// name from `syntect::highlighting::ThemeSet::load_defaults()` works.
+    #[serde(default = "default_syntax_theme")]
+    pub syntax_theme: String,
+    /// Directory where the `s` hotkey writes saved files.
+    ///
+    /// Defaults to the current working directory (`./`). Supports `~`
+    /// expansion.
+    #[serde(default = "default_save_dir")]
+    pub save_dir: String,
 }
 
 impl Default for UiConfig {
@@ -34,6 +55,9 @@ impl Default for UiConfig {
             show_help_bar: default_show_help_bar(),
             refresh_interval_secs: default_refresh_interval(),
             timezone: None,
+            file_preview_refresh_secs: default_file_preview_refresh(),
+            syntax_theme: default_syntax_theme(),
+            save_dir: default_save_dir(),
         }
     }
 }
@@ -43,6 +67,9 @@ impl UiConfig {
         self.show_help_bar == default_show_help_bar()
             && self.refresh_interval_secs == default_refresh_interval()
             && self.timezone.is_none()
+            && self.file_preview_refresh_secs == default_file_preview_refresh()
+            && self.syntax_theme == default_syntax_theme()
+            && self.save_dir == default_save_dir()
     }
 
     /// Returns the configured timezone, falling back to UTC if unset or invalid.
@@ -54,12 +81,41 @@ impl UiConfig {
     }
 }
 
+impl UiConfig {
+    /// Build the FilesView's tunables from the UI config.
+    pub fn files_config(&self) -> FilesConfig {
+        FilesConfig {
+            tail_interval: if self.file_preview_refresh_secs == 0 {
+                None
+            } else {
+                Some(std::time::Duration::from_secs(
+                    self.file_preview_refresh_secs,
+                ))
+            },
+            syntax_theme: self.syntax_theme.clone(),
+            save_dir: self.save_dir.clone(),
+        }
+    }
+}
+
 fn default_show_help_bar() -> bool {
     true
 }
 
 fn default_refresh_interval() -> u64 {
     30
+}
+
+fn default_file_preview_refresh() -> u64 {
+    3
+}
+
+fn default_syntax_theme() -> String {
+    "base16-ocean.dark".to_string()
+}
+
+fn default_save_dir() -> String {
+    "./".to_string()
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

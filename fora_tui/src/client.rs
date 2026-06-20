@@ -3,7 +3,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use azure_identity::AzureCliCredential;
 use azure_ml::MachineLearningServicesClient;
-use mlflow::MlflowClient;
+use mlflow::{ArtifactsClient, MlflowClient};
 
 use crate::config::WorkspaceConfig;
 
@@ -12,6 +12,7 @@ use crate::config::WorkspaceConfig;
 pub struct AzureClient {
     inner: Arc<MachineLearningServicesClient>,
     mlflow_client: MlflowClient,
+    artifacts_client: ArtifactsClient,
     pub workspace: WorkspaceConfig,
 }
 
@@ -27,6 +28,14 @@ impl AzureClient {
         )?;
 
         let mlflow_client = MlflowClient::new(
+            credential.clone(),
+            &workspace.region,
+            &workspace.subscription_id,
+            &workspace.resource_group,
+            &workspace.workspace_name,
+        );
+
+        let artifacts_client = ArtifactsClient::new(
             credential,
             &workspace.region,
             &workspace.subscription_id,
@@ -37,6 +46,7 @@ impl AzureClient {
         Ok(Self {
             inner: Arc::new(client),
             mlflow_client,
+            artifacts_client,
             workspace,
         })
     }
@@ -51,6 +61,10 @@ impl AzureClient {
 
     pub fn mlflow(&self) -> &MlflowClient {
         &self.mlflow_client
+    }
+
+    pub fn artifacts(&self) -> &ArtifactsClient {
+        &self.artifacts_client
     }
 
     pub fn resource_group(&self) -> &str {

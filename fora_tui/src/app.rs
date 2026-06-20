@@ -3,12 +3,14 @@ use std::time::Duration;
 
 use anyhow::Result;
 use azure_ml::models::JobStatus;
+use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use crossterm::execute;
 use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
+use mlflow::ArtifactEntry;
 use ratatui::backend::CrosstermBackend;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
@@ -105,13 +107,58 @@ pub enum Action {
         error: String,
     },
 
+    // Run artifacts (detail pane Files sub-tab)
+    /// Directory listing arrived. `path` is the logical (POSIX-style)
+    /// artifact path relative to the run root; the root is `""`.
+    RunArtifactListLoaded {
+        run_id: String,
+        path: String,
+        entries: Vec<ArtifactEntry>,
+    },
+    RunArtifactListFailed {
+        run_id: String,
+        path: String,
+        error: String,
+    },
+    /// File contents arrived (or a Range-suffix in the tail case).
+    /// Carries no SAS URL — credentials stay inside the fetcher task.
+    RunArtifactContentLoaded {
+        run_id: String,
+        path: String,
+        bytes: Bytes,
+        etag: Option<String>,
+        last_modified: Option<String>,
+        /// True when this is a `Range`-fetched suffix that should be
+        /// appended to the existing cached bytes rather than replacing them.
+        is_suffix: bool,
+    },
+    RunArtifactContentFailed {
+        run_id: String,
+        path: String,
+        error: String,
+    },
+    /// HEAD/GET returned 304 — the cached preview is still current.
+    RunArtifactNotModified {
+        run_id: String,
+        path: String,
+    },
+
     // Shared
     Error(String),
+    /// Non-error transient message (e.g. "Saved file to /path"). Mirrors
+    /// `Error` rendering but with informational styling.
+    Notice(String),
     RefreshRequested,
     SaveColumnConfig {
         tab: String,
         columns: Vec<String>,
     },
+    /// Toggle the fullscreen preview overlay. When entering, the app
+    /// hands the entire terminal to the active tab's
+    /// `render_fullscreen` (which delegates to the file preview); when
+    /// leaving, the app restores normal rendering. Sent by the Files
+    /// sub-tab's `z` keybinding.
+    ToggleFullscreenPreview,
 }
 
 pub struct App {
@@ -123,11 +170,16 @@ pub struct App {
     show_help_bar: bool,
     show_no_config: bool,
     error_message: Option<String>,
+    info_message: Option<String>,
     action_tx: mpsc::UnboundedSender<Action>,
     action_rx: mpsc::UnboundedReceiver<Action>,
     should_quit: bool,
     active_workspace_idx: Option<usize>,
     experiment_disk_cache: Option<ExperimentDiskCache>,
+    /// When true, render only the active tab's fullscreen overlay
+    /// (currently used by the Files sub-tab to give the entire terminal
+    /// to a single file preview). Toggled by `Action::ToggleFullscreenPreview`.
+    fullscreen_preview: bool,
 }
 
 impl App {
@@ -175,12 +227,14 @@ impl App {
                 initial_exp_cache.clone(),
                 config.ui.tz(),
                 refresh_interval,
+                config.ui.files_config(),
             )),
             Box::new(ExperimentsTab::new(
                 client.clone(),
                 initial_exp_cache,
                 config.ui.tz(),
                 refresh_interval,
+                config.ui.files_config(),
             )),
             Box::new(ComputeTab::new(
                 client,
@@ -200,11 +254,13 @@ impl App {
             show_help_bar,
             show_no_config,
             error_message: None,
+            info_message: None,
             action_tx,
             action_rx,
             should_quit: false,
             active_workspace_idx,
             experiment_disk_cache,
+            fullscreen_preview: false,
         })
     }
 
@@ -255,10 +311,31 @@ impl App {
     fn render(&mut self, frame: &mut ratatui::Frame) {
         let area = frame.area();
 
-        // Layout: tab bar (1) | content (flex) | help bar (1, optional) | error (1, optional)
+        // Fullscreen overlay short-circuit: if the user is in
+        // fullscreen-preview mode and the active tab still has
+        // something to fullscreen, give it the entire terminal. We
+        // intentionally skip the tab bar, help bar, info/error rows
+        // and detail-pane chrome so the user sees only file content.
+        // If the active tab can't fullscreen anything (e.g. they
+        // closed the detail pane or switched sub-tabs), we silently
+        // exit fullscreen mode and fall through to the normal render.
+        if self.fullscreen_preview {
+            if let Some(tab) = self.tabs.get_mut(self.active_tab) {
+                if tab.render_fullscreen(frame, area) {
+                    return;
+                }
+            }
+            self.fullscreen_preview = false;
+        }
+
+        // Layout: tab bar (1) | content (flex) | help bar (1, optional)
+        // | notice (1, optional) | error (1, optional)
         let mut constraints = vec![Constraint::Length(1), Constraint::Min(1)];
 
         if self.show_help_bar {
+            constraints.push(Constraint::Length(1));
+        }
+        if self.info_message.is_some() {
             constraints.push(Constraint::Length(1));
         }
         if self.error_message.is_some() {
@@ -290,6 +367,14 @@ impl App {
             idx += 1;
         }
 
+        // Info / notice bar (rendered before errors so errors stay closest to the bottom).
+        if let Some(ref info) = self.info_message {
+            let notice =
+                Paragraph::new(format!(" ✓ {}", info)).style(Style::default().fg(Theme::ACCENT));
+            frame.render_widget(notice, chunks[idx]);
+            idx += 1;
+        }
+
         // Error bar
         if let Some(ref err) = self.error_message {
             let error =
@@ -312,8 +397,36 @@ impl App {
             return;
         }
 
-        // Clear error on any key press
+        // Clear transient messages on any key press
         self.error_message = None;
+        self.info_message = None;
+
+        // Fullscreen preview short-circuit: only quit and
+        // exit-fullscreen keys plus keys consumed by the active tab's
+        // file preview reach the tab. The global tab-switching and
+        // workspace-picker keys are intentionally disabled so the user
+        // can stay focused on the open file.
+        if self.fullscreen_preview {
+            match key.code {
+                KeyCode::Esc => {
+                    self.fullscreen_preview = false;
+                    return;
+                }
+                KeyCode::Char('q') => {
+                    self.should_quit = true;
+                    return;
+                }
+                KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                    self.should_quit = true;
+                    return;
+                }
+                _ => {}
+            }
+            if let Some(tab) = self.tabs.get_mut(self.active_tab) {
+                let _ = tab.handle_key(key, &self.action_tx);
+            }
+            return;
+        }
 
         // Workspace picker takes priority
         if self.workspace_picker.active {
@@ -370,6 +483,9 @@ impl App {
             Action::Error(msg) => {
                 self.error_message = Some(msg.clone());
             }
+            Action::Notice(msg) => {
+                self.info_message = Some(msg.clone());
+            }
             Action::RefreshRequested => {
                 // Re-trigger tick to pick up invalidated caches
                 self.handle_tick();
@@ -393,6 +509,20 @@ impl App {
                     disk_cache.save(cache);
                 }
             }
+            Action::ToggleFullscreenPreview => {
+                // Only enter fullscreen when the active tab actually
+                // has a preview to show; otherwise the toggle would
+                // produce a blank screen with no way back.
+                if self.fullscreen_preview {
+                    self.fullscreen_preview = false;
+                } else if self
+                    .tabs
+                    .get(self.active_tab)
+                    .is_some_and(|t| t.supports_fullscreen())
+                {
+                    self.fullscreen_preview = true;
+                }
+            }
             _ => {}
         }
 
@@ -407,6 +537,10 @@ impl App {
             match AzureClient::new(ws.clone()) {
                 Ok(client) => {
                     self.active_workspace_idx = Some(idx);
+                    // Tabs are recreated below — any open file preview
+                    // is gone, so any fullscreen overlay would point at
+                    // stale state. Drop it.
+                    self.fullscreen_preview = false;
 
                     // Load experiment cache for the new workspace
                     let disk_cache = ExperimentDiskCache::load(
@@ -420,6 +554,7 @@ impl App {
                     // Recreate tabs with new client
                     let refresh = self.config.ui.refresh_interval_secs;
                     let tz = self.config.ui.tz();
+                    let files_config = self.config.ui.files_config();
                     self.tabs = vec![
                         Box::new(RecentJobsTab::new(
                             Some(client.clone()),
@@ -428,12 +563,14 @@ impl App {
                             exp_cache.clone(),
                             tz,
                             refresh,
+                            files_config.clone(),
                         )),
                         Box::new(ExperimentsTab::new(
                             Some(client.clone()),
                             exp_cache,
                             tz,
                             refresh,
+                            files_config,
                         )),
                         Box::new(ComputeTab::new(
                             Some(client),

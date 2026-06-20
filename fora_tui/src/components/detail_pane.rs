@@ -13,6 +13,7 @@ use ratatui::Frame;
 
 use crate::app::Action;
 use crate::client::AzureClient;
+use crate::components::files_view::FilesView;
 use crate::components::job_detail::{self, JobDetail};
 use crate::tabs::ActionSender;
 use crate::theme::{self, Theme};
@@ -24,22 +25,25 @@ use crate::theme::{self, Theme};
 pub enum DetailTab {
     Info,
     Metrics,
+    Files,
 }
 
 impl DetailTab {
-    const ALL: &[DetailTab] = &[DetailTab::Info, DetailTab::Metrics];
+    const ALL: &[DetailTab] = &[DetailTab::Info, DetailTab::Metrics, DetailTab::Files];
 
     fn index(self) -> usize {
         match self {
             DetailTab::Info => 0,
             DetailTab::Metrics => 1,
+            DetailTab::Files => 2,
         }
     }
 
     fn label(self) -> &'static str {
         match self {
-            DetailTab::Info => "Info",
-            DetailTab::Metrics => "Metrics",
+            DetailTab::Info => "1 Info",
+            DetailTab::Metrics => "2 Metrics",
+            DetailTab::Files => "3 Files",
         }
     }
 }
@@ -98,7 +102,7 @@ const CHART_HEIGHT: u16 = 12;
 
 // ── DetailPane ─────────────────────────────────────────────────────────
 
-/// Stateful detail pane with sub-tabs (Info, Metrics).
+/// Stateful detail pane with sub-tabs (Info, Metrics, Files).
 pub struct DetailPane {
     pub active_tab: DetailTab,
     // Info tab state
@@ -117,10 +121,27 @@ pub struct DetailPane {
     metrics_cache: HashMap<String, MetricsState>,
     /// The run_id currently displayed.
     current_run_id: Option<String>,
+    /// Files sub-tab state.
+    files_view: FilesView,
 }
 
-impl Default for DetailPane {
-    fn default() -> Self {
+impl DetailPane {
+    /// Create a new detail pane. The `client` is forwarded to the Files
+    /// sub-tab so it can fetch the artifact tree and file contents
+    /// independently; `None` is acceptable and the Files tab will render
+    /// a degraded "no client" state.
+    pub fn new(client: Option<AzureClient>) -> Self {
+        Self::with_files_config(
+            client,
+            crate::components::files_view::FilesConfig::default(),
+        )
+    }
+
+    /// Like [`Self::new`] but with explicit Files sub-tab tunables.
+    pub fn with_files_config(
+        client: Option<AzureClient>,
+        files_config: crate::components::files_view::FilesConfig,
+    ) -> Self {
         Self {
             active_tab: DetailTab::Info,
             info_scroll: 0,
@@ -133,13 +154,8 @@ impl Default for DetailPane {
             metrics_count: 0,
             metrics_cache: HashMap::new(),
             current_run_id: None,
+            files_view: FilesView::with_config(client, files_config),
         }
-    }
-}
-
-impl DetailPane {
-    pub fn new() -> Self {
-        Self::default()
     }
 
     /// Reset scroll when a new job is selected or the pane is opened.
@@ -150,6 +166,7 @@ impl DetailPane {
         self.selected_metric_index = 0;
         self.metrics_count = 0;
         self.current_run_id = None;
+        self.files_view.reset();
     }
 
     /// Clear the metrics cache so the next visit to the Metrics tab re-fetches.
@@ -157,7 +174,7 @@ impl DetailPane {
         self.metrics_cache.clear();
     }
 
-    /// Update metrics state from an action.
+    /// Update metrics + artifact state from an action.
     pub fn handle_action(&mut self, action: &Action) {
         match action {
             Action::MetricBatchLoaded { run_id, metric } => {
@@ -205,6 +222,13 @@ impl DetailPane {
                 self.metrics_cache
                     .insert(run_id.clone(), MetricsState::Error(error.clone()));
             }
+            Action::RunArtifactListLoaded { .. }
+            | Action::RunArtifactListFailed { .. }
+            | Action::RunArtifactContentLoaded { .. }
+            | Action::RunArtifactContentFailed { .. }
+            | Action::RunArtifactNotModified { .. } => {
+                self.files_view.handle_action(action);
+            }
             _ => {}
         }
     }
@@ -215,39 +239,71 @@ impl DetailPane {
         key: KeyEvent,
         run_id: &str,
         metric_keys: &[String],
+        action_tx: &ActionSender,
     ) -> DetailKeyResult {
-        match key.code {
-            KeyCode::Left => {
-                if self.active_tab != DetailTab::Info {
+        // Esc always closes the pane regardless of active sub-tab.
+        if key.code == KeyCode::Esc {
+            return DetailKeyResult::Close;
+        }
+
+        // Sub-tab switching with uniform 1/2/3 keys.
+        if let KeyCode::Char(c) = key.code {
+            match c {
+                '1' => {
+                    if self.active_tab == DetailTab::Files {
+                        self.files_view.on_leave();
+                    }
                     self.active_tab = DetailTab::Info;
+                    return DetailKeyResult::Consumed;
                 }
-                DetailKeyResult::Consumed
-            }
-            KeyCode::Right => {
-                if self.active_tab != DetailTab::Metrics {
+                '2' => {
+                    if self.active_tab == DetailTab::Files {
+                        self.files_view.on_leave();
+                    }
+                    let was_metrics = self.active_tab == DetailTab::Metrics;
                     self.active_tab = DetailTab::Metrics;
-                    return self.maybe_fetch_metrics(run_id, metric_keys);
+                    if !was_metrics {
+                        return self.maybe_fetch_metrics(run_id, metric_keys);
+                    }
+                    return DetailKeyResult::Consumed;
                 }
-                DetailKeyResult::Consumed
+                '3' => {
+                    self.active_tab = DetailTab::Files;
+                    self.files_view.on_enter(run_id, action_tx);
+                    return DetailKeyResult::Consumed;
+                }
+                _ => {}
             }
-            KeyCode::Up | KeyCode::Char('k') => {
-                self.scroll_up();
-                DetailKeyResult::Consumed
+        }
+
+        // Delegate to the active sub-tab.
+        match self.active_tab {
+            DetailTab::Files => {
+                if self.files_view.handle_key(key, run_id, action_tx) {
+                    DetailKeyResult::Consumed
+                } else {
+                    DetailKeyResult::Ignored
+                }
             }
-            KeyCode::Down | KeyCode::Char('j') => {
-                self.scroll_down();
-                DetailKeyResult::Consumed
-            }
-            KeyCode::Home => {
-                self.scroll_to_top();
-                DetailKeyResult::Consumed
-            }
-            KeyCode::End => {
-                self.scroll_to_end();
-                DetailKeyResult::Consumed
-            }
-            KeyCode::Esc => DetailKeyResult::Close,
-            _ => DetailKeyResult::Ignored,
+            DetailTab::Info | DetailTab::Metrics => match key.code {
+                KeyCode::Up | KeyCode::Char('k') => {
+                    self.scroll_up();
+                    DetailKeyResult::Consumed
+                }
+                KeyCode::Down | KeyCode::Char('j') => {
+                    self.scroll_down();
+                    DetailKeyResult::Consumed
+                }
+                KeyCode::Home => {
+                    self.scroll_to_top();
+                    DetailKeyResult::Consumed
+                }
+                KeyCode::End => {
+                    self.scroll_to_end();
+                    DetailKeyResult::Consumed
+                }
+                _ => DetailKeyResult::Ignored,
+            },
         }
     }
 
@@ -259,6 +315,7 @@ impl DetailPane {
             DetailTab::Metrics => {
                 self.selected_metric_index = self.selected_metric_index.saturating_sub(1);
             }
+            DetailTab::Files => {} // handled by FilesView
         }
     }
 
@@ -273,6 +330,7 @@ impl DetailPane {
                         (self.selected_metric_index + 1).min(self.metrics_count - 1);
                 }
             }
+            DetailTab::Files => {}
         }
     }
 
@@ -280,6 +338,7 @@ impl DetailPane {
         match self.active_tab {
             DetailTab::Info => self.info_scroll = 0,
             DetailTab::Metrics => self.selected_metric_index = 0,
+            DetailTab::Files => {}
         }
     }
 
@@ -295,6 +354,7 @@ impl DetailPane {
                     self.selected_metric_index = self.metrics_count - 1;
                 }
             }
+            DetailTab::Files => {}
         }
     }
 
@@ -316,6 +376,38 @@ impl DetailPane {
     }
 
     /// Render the detail pane into the given area.
+    /// Render the file preview into the entire area, hiding the detail
+    /// pane chrome (border, sub-tab bar) and the Files-tab tree pane.
+    /// Returns `true` when something was actually rendered; `false` if
+    /// fullscreen is not applicable (wrong sub-tab, no file previewed).
+    /// In the latter case the caller should fall back to the normal
+    /// render path.
+    pub fn render_fullscreen(
+        &mut self,
+        frame: &mut Frame,
+        area: Rect,
+        status: Option<azure_ml::models::JobStatus>,
+    ) -> bool {
+        if self.active_tab != DetailTab::Files || !self.files_view.has_preview() {
+            return false;
+        }
+        // The app bypasses `render()` while in fullscreen, so feed the
+        // current run status here too; otherwise the live-tail loop never
+        // sees the run reach a terminal state and keeps polling.
+        if let Some(s) = status.as_ref() {
+            self.files_view.on_status(s);
+        }
+        self.files_view.render_fullscreen(frame, area);
+        true
+    }
+
+    /// True when [`Self::render_fullscreen`] would render something.
+    /// Used by the app to decide whether the fullscreen toggle should
+    /// take effect or be silently ignored.
+    pub fn supports_fullscreen(&self) -> bool {
+        self.active_tab == DetailTab::Files && self.files_view.has_preview()
+    }
+
     pub fn render(&mut self, frame: &mut Frame, area: Rect, job: &JobDetail, run_id: &str) {
         let block = Block::default()
             .title(format!(" {} ", job.display_name))
@@ -336,6 +428,11 @@ impl DetailPane {
 
         self.current_run_id = Some(run_id.to_string());
 
+        // Let the Files sub-tab observe status so it can stop tailing
+        // when the run reaches a terminal state. Cheap when status is
+        // unchanged.
+        self.files_view.on_status(job.status);
+
         match self.active_tab {
             DetailTab::Info => {
                 self.render_info_tab(frame, chunks[1], job);
@@ -343,7 +440,23 @@ impl DetailPane {
             DetailTab::Metrics => {
                 self.render_metrics_tab(frame, chunks[1], run_id);
             }
+            DetailTab::Files => {
+                self.files_view.render(frame, chunks[1], run_id);
+            }
         }
+    }
+
+    /// Key hints for the help bar that depend on the active sub-tab.
+    pub fn key_hints(&self) -> Vec<(&'static str, &'static str)> {
+        let mut hints: Vec<(&'static str, &'static str)> = vec![("1/2/3", "Sub-tab")];
+        match self.active_tab {
+            DetailTab::Files => hints.extend(self.files_view.key_hints()),
+            DetailTab::Info | DetailTab::Metrics => {
+                hints.push(("↑↓", "Scroll"));
+            }
+        }
+        hints.push(("Esc", "Close Detail"));
+        hints
     }
 
     fn render_tab_bar(&self, frame: &mut Frame, area: Rect) {
