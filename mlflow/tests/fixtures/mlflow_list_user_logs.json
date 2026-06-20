@@ -1,0 +1,9 @@
+{
+  "root_uri": "azureml://eastus2.api.azureml.ms/mlflow/v2.0/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.MachineLearningServices/workspaces/test-workspace/experiments/11111111-1111-1111-1111-111111111111/runs/test_run_id/artifacts",
+  "files": [
+    {
+      "path": "user_logs/std_log.txt",
+      "file_size": "-1"
+    }
+  ]
+}
