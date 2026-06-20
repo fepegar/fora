@@ -217,3 +217,108 @@ pub struct SearchRunsResponse {
 pub struct GetRunResponse {
     pub run: Run,
 }
+
+// ── Artifact types ─────────────────────────────────────────────────────
+
+/// A single entry returned by `mlflow/artifacts/list`.
+///
+/// `file_size` is reported as a JSON string by the Azure ML MLflow proxy
+/// (e.g. `"42"`, or `"-1"` when the size is unknown), so we deserialise it
+/// via a flexible deserialiser and normalise to `Option<u64>`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ArtifactEntry {
+    pub path: String,
+    #[serde(default)]
+    pub is_dir: bool,
+    #[serde(default, deserialize_with = "deserialize_optional_file_size")]
+    pub file_size: Option<u64>,
+}
+
+/// Response of `mlflow/artifacts/list`.
+///
+/// Pagination is observed to be unused for typical run sizes but the field
+/// is honoured if the server includes it (matching the MLflow REST spec).
+#[derive(Debug, Clone, Deserialize)]
+pub struct ListArtifactsResponse {
+    #[serde(default)]
+    pub root_uri: String,
+    #[serde(default)]
+    pub files: Vec<ArtifactEntry>,
+    #[serde(default, alias = "nextPageToken")]
+    pub next_page_token: Option<String>,
+}
+
+/// Response of `artifact/v2.0/.../contentinfo/{origin}/{container}/{path}`.
+///
+/// `content_uri` is a short-lived SAS URL pointing at Azure Blob Storage.
+/// Callers should download the bytes (and call `HEAD` / use conditional
+/// requests) directly against that URL rather than re-proxying via the
+/// Run History service.
+#[derive(Debug, Clone, Deserialize)]
+pub struct ArtifactContentInfo {
+    #[serde(rename = "contentUri")]
+    pub content_uri: String,
+    #[serde(default)]
+    pub origin: String,
+    #[serde(default)]
+    pub container: String,
+    #[serde(default)]
+    pub path: String,
+    #[serde(default, rename = "contentLength")]
+    pub content_length: Option<u64>,
+}
+
+fn deserialize_optional_file_size<'de, D>(deserializer: D) -> Result<Option<u64>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::de;
+
+    struct V;
+    impl<'de> de::Visitor<'de> for V {
+        type Value = Option<u64>;
+        fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+            f.write_str("a file size as integer, integer string, or null")
+        }
+        fn visit_i64<E: de::Error>(self, v: i64) -> Result<Option<u64>, E> {
+            match v {
+                -1 => Ok(None),
+                n if n < 0 => Err(de::Error::custom(format!(
+                    "unexpected negative file size {} (only -1 is the unknown-size sentinel)",
+                    n
+                ))),
+                n => Ok(Some(n as u64)),
+            }
+        }
+        fn visit_u64<E: de::Error>(self, v: u64) -> Result<Option<u64>, E> {
+            Ok(Some(v))
+        }
+        fn visit_str<E: de::Error>(self, v: &str) -> Result<Option<u64>, E> {
+            match v.parse::<i64>() {
+                Ok(-1) => Ok(None),
+                Ok(n) if n < 0 => Err(de::Error::custom(format!(
+                    "unexpected negative file size {} (only -1 is the unknown-size sentinel)",
+                    n
+                ))),
+                Ok(n) => Ok(Some(n as u64)),
+                // Sizes above i64::MAX are still valid u64 byte counts, so
+                // fall back to u64 before rejecting as non-numeric.
+                Err(_) => match v.parse::<u64>() {
+                    Ok(n) => Ok(Some(n)),
+                    Err(_) => Err(de::Error::custom(format!(
+                        "invalid file size: expected an integer or integer string, got {:?}",
+                        v
+                    ))),
+                },
+            }
+        }
+        fn visit_none<E: de::Error>(self) -> Result<Option<u64>, E> {
+            Ok(None)
+        }
+        fn visit_unit<E: de::Error>(self) -> Result<Option<u64>, E> {
+            Ok(None)
+        }
+    }
+
+    deserializer.deserialize_any(V)
+}

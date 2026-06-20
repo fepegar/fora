@@ -34,3 +34,4 @@ dirs = "5.0"
 reqwest = { version = "0.13", default-features = false, features = ["json", "query", "rustls", "native-tls-vendored"] }
 url = "2.4"
 serde_with = "3.0"
+bytes = "1"

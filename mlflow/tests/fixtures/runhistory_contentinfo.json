@@ -1,0 +1,8 @@
+{
+  "contentUri": "https://teststorage.blob.core.windows.net/azureml/ExperimentRun/dcid.test_run_id/user_logs/std_log.txt?sv=2019-07-07&sr=b&sig=REDACTED&skoid=REDACTED&sktid=REDACTED&skt=REDACTED&ske=REDACTED&sks=b&skv=2019-07-07&st=REDACTED&se=REDACTED&sp=r",
+  "origin": "ExperimentRun",
+  "container": "dcid.test_run_id",
+  "path": "user_logs/std_log.txt",
+  "tags": {},
+  "contentLength": null
+}

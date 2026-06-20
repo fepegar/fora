@@ -233,4 +233,77 @@ impl MlflowClient {
 
         Ok(all)
     }
+
+    /// List artifacts for a run at the given path (root if `path` is empty).
+    ///
+    /// Returns the immediate children of `path` (one level deep). Use
+    /// recursive calls when expanding subdirectories in a tree view.
+    ///
+    /// Note: against Azure ML's MLflow proxy, `file_size` is always reported
+    /// as `-1` and is therefore returned as `None`. Use [`ArtifactsClient`]
+    /// to obtain real sizes via `HEAD` against the blob SAS URL.
+    pub async fn list_artifacts(
+        &self,
+        run_id: &str,
+        path: &str,
+        page_token: Option<&str>,
+    ) -> Result<crate::models::ListArtifactsResponse> {
+        let url = format!("{}/artifacts/list", self.base_url);
+
+        let token = self.get_token().await?;
+        let mut req = self
+            .http
+            .get(&url)
+            .bearer_auth(&token)
+            .query(&[("run_id", run_id)]);
+
+        if !path.is_empty() {
+            req = req.query(&[("path", path)]);
+        }
+        if let Some(pt) = page_token {
+            req = req.query(&[("page_token", pt)]);
+        }
+
+        let resp = req
+            .send()
+            .await
+            .context("MLflow artifacts/list request failed")?;
+
+        let status = resp.status();
+        if !status.is_success() {
+            let text = resp.text().await.unwrap_or_default();
+            anyhow::bail!("MLflow artifacts/list returned {}: {}", status, text);
+        }
+
+        resp.json::<crate::models::ListArtifactsResponse>()
+            .await
+            .context("Failed to parse artifacts/list response")
+    }
+
+    /// Fetch every artifact entry directly under `path` across all pages.
+    ///
+    /// This lists a single directory level (paginating `artifacts/list`);
+    /// it does not recurse into subdirectories.
+    pub async fn list_all_artifacts(
+        &self,
+        run_id: &str,
+        path: &str,
+    ) -> Result<Vec<crate::models::ArtifactEntry>> {
+        let mut all = Vec::new();
+        let mut page_token: Option<String> = None;
+
+        loop {
+            let resp = self
+                .list_artifacts(run_id, path, page_token.as_deref())
+                .await?;
+            all.extend(resp.files);
+
+            match resp.next_page_token {
+                Some(t) if !t.is_empty() => page_token = Some(t),
+                _ => break,
+            }
+        }
+
+        Ok(all)
+    }
 }
