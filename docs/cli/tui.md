@@ -62,9 +62,15 @@ While a run is active, the previewed file is live-tailed every
 | `PgUp` / `PgDn` | Page the focused pane |
 | `Home` / `g` | Jump to the top of the focused pane |
 | `End` / `G` | Jump to the bottom of the focused pane |
-| `s` | Save the previewed file to disk (collision-safe; see `save_dir`) |
+| `s` | Download the highlighted file or directory to disk |
 | `r` | Force-refresh the current directory and previewed file |
 | `z` | Toggle fullscreen preview (hides everything except the file content; `Esc` exits fullscreen) |
+
+Pressing `s` prompts for a destination path, pre-filled with
+`<save_dir>/<name>` (see [`save_dir`](../setup)). Edit it to
+rename or relocate, then press `Enter`. Directories download recursively,
+preserving their structure. If the destination already exists you are
+asked to confirm before it is overwritten.
 
 ## Environment variables
 

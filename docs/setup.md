@@ -51,8 +51,9 @@ file_preview_refresh_secs = 3
 # Any theme bundled with syntect works (e.g. "InspiredGitHub",
 # "Solarized (dark)", "base16-eighties.dark").
 syntax_theme = "base16-ocean.dark"
-# Directory where the `s` hotkey writes saved artifact files. `~` is
-# expanded; relative paths resolve against the current working directory.
+# Default directory pre-filled in the download prompt opened by the `s`
+# hotkey in the Files sub-tab. `~` is expanded; relative paths resolve
+# against the current working directory.
 save_dir = "./"
 
 # Workspace shown when launching the TUI (must match a workspace name below).
@@ -92,7 +93,7 @@ compute = ["name", "type", "state", "vm_size"]
 | `timezone` | string | `"UTC"` | IANA timezone name for displaying timestamps (e.g. `"Europe/London"`, `"America/New_York"`). Handles daylight saving time automatically. |
 | `file_preview_refresh_secs` | integer | `3` | Polling interval used by the Files sub-tab to re-check the previewed file while the run is active. Set `0` to disable live tailing. |
 | `syntax_theme` | string | `"base16-ocean.dark"` | syntect theme used for highlighted file previews. Any theme bundled with `syntect` works (`InspiredGitHub`, `Solarized (dark)`, `base16-eighties.dark`, …). |
-| `save_dir` | string | `"./"` | Directory the Files sub-tab writes to when you press `s`. `~` is expanded; relative paths resolve against the current working directory. |
+| `save_dir` | string | `"./"` | Default directory pre-filled in the Files sub-tab download prompt (`s`). `~` is expanded; relative paths resolve against the current working directory. |
 
 ### Top-level fields
 
